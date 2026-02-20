@@ -1,0 +1,46 @@
+{
+    "folders": [
+        {
+            "name": "Source Project",
+            "path": ""
+        },
+        {
+            "name": "🛠️ Upgrade and Testing Agents 🧪",
+            "path": "."
+        }
+    ],
+    "settings": {
+        "chat.agentFilesLocations": {
+            ".github/agents/upgrade": true,
+            ".github/agents/upgrade/subagents": true,
+            ".github/agents/testing/": true
+        },
+        "typescript.preferences.importModuleSpecifier": "relative",
+        "typescript.updateImportsOnFileMove.enabled": "always",
+        "files.exclude": {
+            "**/node_modules": true,
+            "**/dist": true,
+            "**/bin": true,
+            "**/obj": true
+        },
+        "dotnet.preferCSharpExtension": true,
+        "sf_agents": {
+            "SitefinityUrl": "",
+            "BackendCredentials": {
+                "username": "",
+                "password": ""
+            },
+            "TargetVersion": "",
+            "SourceVersion": ""
+        }
+    },
+    "extensions": {
+        "recommendations": [
+            "github.copilot",
+            "github.copilot-chat",
+            "ms-vscode.vscode-typescript-next",
+            "ms-vscode.vscode-json",
+            "ms-vscode.vscode-speech"
+        ]
+    }
+}

@@ -1,0 +1,35 @@
+{
+  "name": "upgrade-and-testing",
+  "version": "1.0.0",
+  "description": "An MCP server that automates Sitefinity CMS upgrades with AI agents for test generation, upgrade execution, and post-upgrade repairs.",
+  "main": "dist/upgrade-and-testing.js",
+  "type": "module",
+  "bin": {
+    "upgrade-and-testing": "./dist/upgrade-and-testing.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/upgrade-and-testing.js",
+    "dev": "tsc --watch",
+    "test": "npx playwright test",
+    "test:backend": "npx playwright test --project=backend-chromium",
+    "test:ui": "npx playwright test --ui",
+    "test:report": "npx playwright show-report test-results/html-report"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^24.10.1",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "jsonc-parser": "^3.3.1",
+    "zod": "^3.23.8"
+  }
+}

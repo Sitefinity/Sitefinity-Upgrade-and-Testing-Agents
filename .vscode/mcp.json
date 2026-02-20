@@ -1,0 +1,19 @@
+{
+  "servers": {
+    "upgrade-and-testing": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        ".\\dist\\upgrade-and-testing.js"
+      ]
+    },
+    "playwright-test": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "playwright",
+        "run-test-mcp-server"
+      ]
+    }
+  }
+}
