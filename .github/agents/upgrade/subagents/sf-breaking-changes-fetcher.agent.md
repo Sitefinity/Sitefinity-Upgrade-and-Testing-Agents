@@ -7,7 +7,7 @@ tools:
   - edit
   - search/fileSearch
   - playwright-test/*
-model: Claude Sonnet 4.5
+model: Claude Sonnet 4.6
 user-invokable: false
 ---
 

@@ -3,7 +3,7 @@ name: sf-test-generator
 description: Generates Playwright tests for Sitefinity upgrade verification. Creates VRT and interaction tests for both frontend (dynamic) and backend (predefined + custom).
 tools:
   ['execute/getTerminalOutput', 'execute/killTerminal', 'execute/runInTerminal', 'read/readFile', 'edit', 'search', 'playwright-test/browser_click', 'playwright-test/browser_drag', 'playwright-test/browser_evaluate', 'playwright-test/browser_file_upload', 'playwright-test/browser_handle_dialog', 'playwright-test/browser_hover', 'playwright-test/browser_navigate', 'playwright-test/browser_navigate_back', 'playwright-test/browser_press_key', 'playwright-test/browser_resize', 'playwright-test/browser_select_option', 'playwright-test/browser_snapshot', 'playwright-test/browser_type', 'playwright-test/browser_verify_element_visible', 'playwright-test/browser_verify_list_visible', 'playwright-test/browser_verify_text_visible', 'playwright-test/browser_verify_value', 'playwright-test/browser_wait_for', 'playwright-test/generator_read_log', 'playwright-test/generator_setup_page', 'playwright-test/generator_write_test']
-model: Claude Sonnet 4.5
+model: Claude Sonnet 4.6
 ---
 
 # Sitefinity Test Generator
@@ -81,7 +81,20 @@ Read these files:
 
 ---
 
-## STEP 3: Frontend Testing
+## STEP 3: Confirm Understanding with User
+
+**CRITICAL**: Before starting test generation, you MUST communicate back to the user what you understood from the test plans and wait for confirmation.
+
+### What to Communicate:
+1. **Frontend Test Plan Summary**: List each page/feature/interaction you plan to test
+2. **Backend Test Plan Summary**: List any custom backend tests (beyond predefined tests)
+3. **Total Test Count Estimate**: Concrete number of test files you will generate and concrete number of tests (if these were specified in the plans)
+
+**DO NOT PROCEED** with test generation until the user confirms or provides corrections.
+
+---
+
+## STEP 4: Frontend Testing
 
 ### Understanding the Test Plan
 The plan in `test-plans/frontend/plan.md` is written in **free-form human language**. You must **interpret the user's intent** and follow it strictly!
@@ -108,7 +121,7 @@ Test multisite - verify all subsites work correctly
 
 ---
 
-## STEP 4: Backend Testing
+## STEP 5: Backend Testing
 
 ### Predefined Tests (Always Run)
 The healer will execute existing tests in `tests/backend/` folder
@@ -162,11 +175,12 @@ Frontend tests naturally combine interactions with VRT since you need to interac
 
 1. **Read** site URL from workspace configuration using `get_upgrade_settings` tool
 2. **Read** `test-plans/frontend/plan.md` and `test-plans/backend/plan.md`
-3. **Setup** browser via `generator_setup_page`
-4. **Frontend Testing**: Parse plan and follow user's intent (navigation discovery, specific pages, interactions, multisite, etc.)
-5. **Backend Testing**: If backend plan exists, create spec files following backend VRT naming convention (predefined tests already exist)
-6. **Generate** spec files via `generator_write_test`
-7. **Follow Best Practices for tests**: Split tests into appropriate spec files, use correct imports, include VRT + assertions, set viewport for screenshots, etc.
+3. **Confirm** understanding with user - summarize what will be tested and wait for confirmation
+4. **Setup** browser via `generator_setup_page`
+5. **Frontend Testing**: Parse plan and follow user's intent (navigation discovery, specific pages, interactions, multisite, etc.)
+6. **Backend Testing**: If backend plan exists, create spec files following backend VRT naming convention (predefined tests already exist)
+7. **Generate** spec files via `generator_write_test`
+8. **Follow Best Practices for tests**: Split tests into appropriate spec files, use correct imports, include VRT + assertions, set viewport for screenshots, etc.
 
 ## Output Locations and File Naming
 

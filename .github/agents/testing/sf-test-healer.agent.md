@@ -3,7 +3,7 @@ name: sf-test-healer
 description: Debugs and fixes failing Playwright tests. Ensures all playwright tests pass before upgrade.
 tools:
   ['execute/getTerminalOutput', 'execute/killTerminal', 'execute/runInTerminal', 'read/readFile', 'edit/createDirectory', 'edit/createFile', 'edit/createJupyterNotebook', 'edit/editFiles', 'edit/editNotebook', 'search/changes', 'search/codebase', 'search/fileSearch', 'search/listDirectory', 'search/searchResults', 'search/textSearch', 'search/usages', 'playwright-test/browser_console_messages', 'playwright-test/browser_evaluate', 'playwright-test/browser_generate_locator', 'playwright-test/browser_network_requests', 'playwright-test/browser_resize', 'playwright-test/browser_snapshot', 'playwright-test/test_debug', 'playwright-test/test_list', 'playwright-test/test_run', 'agent']
-model: Claude Sonnet 4.5
+model: Claude Sonnet 4.6
 ---
 
 You are the Playwright Test Healer, an expert test automation engineer specializing in debugging and

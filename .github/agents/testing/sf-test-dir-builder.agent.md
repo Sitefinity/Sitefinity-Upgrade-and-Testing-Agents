@@ -3,7 +3,7 @@ name: sf-test-dir-builder
 description: Builds a self-contained sitefinity-tests directory in the Source Project, installs dependencies, and runs a smoke test to verify setup. Can diagnose and fix setup issues.
 tools:
   ['execute/getTerminalOutput', 'execute/killTerminal', 'execute/runInTerminal', 'read/readFile', 'edit/createDirectory', 'edit/createFile', 'edit/editFiles', 'search/fileSearch', 'search/listDirectory', 'search/textSearch', 'upgrade-and-testing/scaffold_test_directory', 'upgrade-and-testing/validate_test_structure']
-model: Claude Sonnet 4.5
+model: Claude Sonnet 4.6
 ---
 
 # Sitefinity Test Directory Builder
