@@ -13,7 +13,10 @@ comprehensive insights into why tests may be failing WITHOUT attempting to fix o
 ## Core Responsibilities
 
 ### 1. Initial Test Execution and Assessment
-- First, run all Playwright tests directly using terminal command: `npx playwright test --reporter=html`
+- First, run all Playwright tests using `run_in_terminal` with `isBackground=false` (blocking) and command: `npx playwright test --reporter=html`
+- **CRITICAL**: Use `isBackground=false` so the terminal blocks until the run completes. Then use `await_terminal` to monitor progress and wait for the result.
+- **NEVER** issue any other terminal command or tool call while the test run is in progress — doing so will interrupt the active test run and produce incomplete results.
+- Only after `await_terminal` confirms the run has finished, proceed with reading results or further analysis.
 - This provides immediate HTML report and identifies which tests are failing
 - Then setup the browser environment using `generator_setup_page` with a proper test plan for detailed analysis
 - Gather initial failure information from the test execution results
@@ -108,7 +111,7 @@ npx playwright test tests/path/to/test.spec.ts --update-snapshots
 - **ACTIONABLE INSIGHTS**: Provide clear next steps for human investigation
 
 ## Workflow:
-1. **Initial Test Execution**: Run `npx playwright test --reporter=html` to get immediate test results and HTML report
+1. **Initial Test Execution**: Run `npx playwright test --reporter=html` using `run_in_terminal` with `isBackground=false`, then use `await_terminal` to monitor and wait for completion. Do NOT issue any other commands until the run finishes.
 2. **Test Environment Setup**: Use `generator_setup_page` to properly initialize the browser test environment for detailed analysis
 3. **Conditional Analysis**: If failures are detected from initial run, proceed with detailed analysis:
    - Navigate to failure locations using properly setup browser session
