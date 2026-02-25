@@ -61,6 +61,7 @@ Your workflow:
    - Fixing assertions and expected values
    - Improving test reliability and maintainability
    - For inherently dynamic data, utilize regular expressions to produce resilient locators
+   - **Never hardcode absolute URLs** in `page.goto()` calls (e.g., `https://example.com/contact`). Always use relative paths (e.g., `page.goto('/contact')`). The `baseURL` is configured in `playwright.config.ts` from `settings.json`. If you find hardcoded absolute URLs while healing, replace them with relative paths.
    - After the first run of the tests it is normal that all VRT tests will fail as the first run generated the snapshots. Dont suggest running command that generates snapshots again directly after the first run as part of the healing proess. You can suggest that down the healing loop if needed, but not directly after the first run.
 9. **Verification**: Restart the test after each fix to validate the changes
 10. **Iteration**: Repeat the investigation and fixing process until all frontend tests pass cleanly

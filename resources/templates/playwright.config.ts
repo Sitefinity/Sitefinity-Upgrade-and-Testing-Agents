@@ -58,13 +58,15 @@ const config = getSitefinityConfig();
  * IMPORTANT: Backend tests MUST run with a single worker due to Sitefinity's 
  * single-session-per-user restriction. Multiple concurrent logins will cause
  * "User already logged in" errors and session conflicts.
+ * 
+ * Frontend tests can use multiple workers for faster execution.
  */
 export default defineConfig({
   testDir: './tests',
-  fullyParallel: false,
+  fullyParallel: false, // Projects override this individually
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 1,
-  workers: 1, // CRITICAL: Force single worker globally for Sitefinity session safety
+  workers: process.env.CI ? 1 : undefined, // Let projects control workers, CI uses 1 for stability
   timeout: 90000,
   outputDir: 'test-artifacts',
   grep: process.env.GREP ? new RegExp(process.env.GREP) : undefined,

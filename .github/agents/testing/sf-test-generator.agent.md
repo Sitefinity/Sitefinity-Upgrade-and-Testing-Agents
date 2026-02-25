@@ -34,12 +34,14 @@ import { test, expect } from './utils';
 
 test.describe('My Feature Tests', () => {
   test('test name', async ({ page }) => {
-    await page.goto('https://example.com/');
+    await page.goto('/');
     // The page fixture automatically handles trial screens
     // No manual trial screen handling needed
   });
 });
 ```
+
+> **NEVER hardcode absolute URLs** (e.g., `https://example.com/contact`) in `page.goto()` calls. Always use **relative paths** (e.g., `page.goto('/contact')`). The `baseURL` is read from `settings.json` via `playwright.config.ts` and applied automatically. Hardcoded URLs break portability across environments (local, staging, production).
 
 ### Backend Tests  
 **ALWAYS** use the custom test fixtures for backend tests to handle Sitefinity trial screens automatically:
