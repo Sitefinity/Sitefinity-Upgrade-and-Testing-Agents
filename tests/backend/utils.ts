@@ -77,9 +77,36 @@ export interface SitefinityConnection {
 }
 
 /**
- * Load Sitefinity connection settings from upgrade-and-testing.code-workspace settings.sf_agents
+ * Load Sitefinity connection settings.
+ *
+ * Resolution order:
+ * 1. settings.json in the test project root (sitefinity-tests/settings.json) — used when
+ *    tests have been scaffolded into their own directory via the test-directory builder.
+ * 2. upgrade-and-testing.code-workspace settings.sf_agents — used when running tests
+ *    directly from the upgrade-and-testing-agents repo during development.
  */
 function loadSitefinityConnection(): SitefinityConnection | null {
+  // 1. Try local settings.json (../../settings.json relative to tests/backend/)
+  const settingsJsonPath = path.resolve(__dirname, '../../settings.json');
+  try {
+    if (fs.existsSync(settingsJsonPath)) {
+      let content = fs.readFileSync(settingsJsonPath, 'utf-8');
+      if (content.charCodeAt(0) === 0xFEFF) content = content.slice(1);
+      const settings = JSON.parse(content);
+      if (settings?.SitefinityUrl) {
+        return {
+          SitefinityUrl: settings.SitefinityUrl || '',
+          Token: '',
+          SitefinityCLIPath: settings.SitefinityCLIPath,
+          BackendCredentials: settings.BackendCredentials
+        } as SitefinityConnection;
+      }
+    }
+  } catch (error) {
+    console.warn('Could not load settings.json:', error);
+  }
+
+  // 2. Fallback: workspace file (when running from the agents repo)
   const workspacePath = path.resolve(__dirname, '../../upgrade-and-testing.code-workspace');
   try {
     if (fs.existsSync(workspacePath)) {
@@ -159,21 +186,11 @@ export const dismissSitefinityTrialScreen = _dismissOverlay;
  */
 export const test = base.extend<{ page: Page }>({
   page: async ({ page: originalPage }, use) => {
-    // Create a monitoring interval that checks for trial screen periodically
-    const trialScreenMonitor = setInterval(async () => {
-      try {
-        // Only check if page is still valid
-        if (originalPage && !originalPage.isClosed()) {
-          await dismissSitefinityTrialScreen(originalPage);
-        }
-      } catch (error) {
-        // Silently ignore errors during monitoring
-      }
-    }, 3000); // Check every 3 seconds (admin pages change less frequently)
-
     // Enhanced goto: domcontentloaded → dismiss overlays → wait for images (2s cap)
     // networkidle is intentionally omitted (can hang on long-polling sites).
     // waitForImagesToLoad ensures layout is settled for VRT screenshots.
+    // NOTE: No background setInterval — trial screen is handled inline on goto/click
+    // to avoid racing with test actions and causing mid-test navigations.
     const originalGoto = originalPage.goto.bind(originalPage);
     originalPage.goto = async (url: string, options?: Parameters<Page['goto']>[1]) => {
       const response = await originalGoto(url, { waitUntil: 'domcontentloaded', ...options });
@@ -192,9 +209,6 @@ export const test = base.extend<{ page: Page }>({
 
     // Use the enhanced page object
     await use(originalPage);
-
-    // Cleanup: stop monitoring when test completes
-    clearInterval(trialScreenMonitor);
   },
 });
 
