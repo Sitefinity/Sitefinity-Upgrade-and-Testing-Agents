@@ -2,14 +2,8 @@
 name: sf-post-upgrade-runtime-repairer
 description: Validates the site loads correctly post-upgrade and repairs runtime errors using knowledge base solutions.
 tools:
-  - upgrade-and-testing/get_upgrade_settings
-  - execute/getTerminalOutput
-  - execute/runInTerminal
-  - read/readFile
-  - edit
-  - search
-  - playwright-test/*
-model: Claude Sonnet 4.5
+  ['execute/getTerminalOutput', 'execute/runInTerminal', 'read/readFile', 'edit', 'search', 'playwright-test/*', 'upgrade-and-testing/build_solution', 'upgrade-and-testing/get_upgrade_settings', 'upgrade-and-testing/prepare_build_environment']
+model: Claude Sonnet 4.6
 ---
 
 # Post-Upgrade Runtime Repairer Agent
@@ -54,6 +48,20 @@ For each error (max 5 attempts per unique error):
 - Apply recommended fix from official sources
 - Document which article provided the solution
 
+**C. Rebuild Decision** (after applying any fix):
+- **Rebuild REQUIRED** when changes affect compiled code:
+  - Modified any `.cs` files (class files, controllers, models, etc.)
+  - Modified `.csproj` files (assembly references, project settings)
+  - Added/removed NuGet packages
+  - Changed assembly bindings in web.config `<runtime>` section
+  - Action: Call `build_solution` tool with `configuration: "Release"` before verifying
+- **Rebuild NOT needed** when changes are configuration-only:
+  - Modified web.config settings (appSettings, connectionStrings, system.web, etc.) - EXCEPT runtime/assemblyBinding
+  - Modified pure config files (DataConfig.config, SecurityConfig.config, etc.)
+  - Changed database connection strings
+  - Modified Sitefinity configuration files
+  - Action: Just proceed to Step 5 (app pool recycles automatically on web.config change)
+
 ### Step 5: Verify Fix
 - Reload homepage after applying fix
 - If error persists → Return to Step 4 (increment attempt counter)
@@ -96,6 +104,28 @@ For each error (max 5 attempts per unique error):
 - **Document all attempts** (fixes tried, KB articles consulted)
 - **Take screenshots** of runtime errors for evidence
 - **One fix at a time** - verify each fix before trying another
+
+## Success Report Format (When Site Loads Successfully)
+
+```
+────────────────────────────────────────────
+✅ RUNTIME REPAIR COMPLETED
+────────────────────────────────────────────
+Runtime errors fixed: [count]
+Issues Resolved:
+  1. [error description]
+     Fix Applied: [description of fix]
+     Method: [Direct fix / KB Article]
+     (if applicable) Source: [file path or KB article URL]
+  2. [error description]
+     Fix Applied: [description of fix]
+     Method: [Direct fix / KB Article]
+     (if applicable) Source: [file path or KB article URL]
+  ...
+Site Status: Homepage loads successfully ✓
+Next Step: Open a new chat session and start the sf-post-upgrade-analyzer agent
+────────────────────────────────────────────
+```
 
 ## Error Report Format (When Escalating)
 

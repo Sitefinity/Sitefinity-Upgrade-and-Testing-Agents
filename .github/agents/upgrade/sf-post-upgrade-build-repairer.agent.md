@@ -13,7 +13,7 @@ tools:
   - search
   - read/problems
   - 'agent'
-model: Claude Sonnet 4.5
+model: Claude Sonnet 4.6
 agents: ['sf-breaking-changes-fetcher']
 ---
 
@@ -92,6 +92,29 @@ If build fails (Step 1d returns `success: false`):
 - **Prioritize breaking changes** documentation over generic fixes
 - **Document all attempts** (fixes tried, results)
 - **Verify each fix** by rebuilding immediately
+
+## Success Report Format (When Build Succeeds)
+
+```
+────────────────────────────────────────────
+✅ BUILD REPAIR COMPLETED
+────────────────────────────────────────────
+Build errors fixed: [count]
+Iterations used: [count/5]
+Issues Resolved:
+  1. [error type/category]
+     Fix Applied: [description of fix]
+     Files Modified: [comma-separated file paths]
+     (if applicable) Breaking Change: [version number or "N/A"]
+  2. [error type/category]
+     Fix Applied: [description of fix]
+     Files Modified: [comma-separated file paths]
+     (if applicable) Breaking Change: [version number or "N/A"]
+  ...
+Build Status: Solution compiles successfully ✓
+Next Step: Open a new chat session and start the sf-post-upgrade-runtime-repairer agent
+────────────────────────────────────────────
+```
 
 ## Error Report Format (When Escalating)
 

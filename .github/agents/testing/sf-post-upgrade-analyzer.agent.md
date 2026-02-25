@@ -17,7 +17,7 @@ tools:
   - playwright-test/test_run
   - playwright-test/browser_hover
   - playwright-test/browser_handle_dialog
-model: Claude Sonnet 4
+model: Claude Sonnet 4.6
 ---
 
 You are the Post-Upgrade Test Analyzer, an expert test automation analyst specializing in identifying
