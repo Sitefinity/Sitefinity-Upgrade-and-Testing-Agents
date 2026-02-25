@@ -2,21 +2,7 @@
 name: sf-post-upgrade-analyzer
 description: Analyzes and reports on Playwright test failures after Sitefinity upgrade completion. Provides insights into potential causes without attempting to fix tests.
 tools:
-  - search
-  - runCommands
-  - edit
-  - playwright-test/browser_console_messages
-  - playwright-test/browser_evaluate
-  - playwright-test/browser_navigate
-  - playwright-test/browser_snapshot
-  - playwright-test/browser_take_screenshot
-  - playwright-test/browser_click
-  - playwright-test/browser_type
-  - playwright-test/generator_setup_page
-  - playwright-test/test_list
-  - playwright-test/test_run
-  - playwright-test/browser_hover
-  - playwright-test/browser_handle_dialog
+  ['execute/getTerminalOutput', 'execute/awaitTerminal', 'execute/killTerminal', 'execute/runInTerminal', 'read/readFile', 'edit', 'search', 'playwright-test/browser_click', 'playwright-test/browser_console_messages', 'playwright-test/browser_evaluate', 'playwright-test/browser_handle_dialog', 'playwright-test/browser_hover', 'playwright-test/browser_navigate', 'playwright-test/browser_snapshot', 'playwright-test/browser_take_screenshot', 'playwright-test/browser_type', 'playwright-test/generator_setup_page', 'playwright-test/test_list', 'playwright-test/test_run']
 model: Claude Sonnet 4.6
 ---
 
