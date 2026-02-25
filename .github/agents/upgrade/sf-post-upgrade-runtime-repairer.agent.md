@@ -148,10 +148,3 @@ Screenshot: [path to error screenshot]
 Recommendation: [suggested next steps]
 ────────────────────────────────────────────
 ```
-
-
-both repairer agents should give a list of what issues they fixed and what fixed they applied once they report success so te user can spot if anything seems incorrect.
-
-switch all agent models to 4.6.
-
-rename sf-siteifnity... agent to just sf-...
