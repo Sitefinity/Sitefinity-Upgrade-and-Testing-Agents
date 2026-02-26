@@ -1,0 +1,31 @@
+# Playwright artifacts
+test-results/
+test-artifacts/
+playwright-report/
+playwright/.cache/
+
+# Credentials - NEVER commit settings.json with real credentials!
+settings.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.local

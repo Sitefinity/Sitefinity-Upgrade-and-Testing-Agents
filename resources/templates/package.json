@@ -1,0 +1,35 @@
+{
+  "name": "sitefinity-upgrade-tests",
+  "version": "1.0.0",
+  "description": "Comprehensive Playwright test suite for Sitefinity CMS upgrade verification",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:backend": "playwright test --project=backend-chromium",
+    "test:frontend": "playwright test --project=frontend-chromium",
+    "test:vrt:backend": "playwright test --project=vrt-backend",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug",
+    "show-report": "playwright show-report",
+    "update-snapshots:backend": "playwright test --project=vrt-backend --update-snapshots",
+    "update-snapshots": "playwright test --update-snapshots"
+  },
+  "keywords": [
+    "sitefinity",
+    "playwright",
+    "testing",
+    "e2e",
+    "upgrade",
+    "verification"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.41.0",
+    "@types/node": "^20.11.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
