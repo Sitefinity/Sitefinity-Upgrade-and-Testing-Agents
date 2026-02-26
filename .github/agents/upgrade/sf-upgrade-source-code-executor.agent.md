@@ -44,4 +44,20 @@ Upgrades Sitefinity CMS projects using MCP tools that auto-discover build tools 
 If the XML Validation step is successful, proceed to run the upgrade command: **Execute upgrade**: Call `run_upgrade`
    - **If fails** (response has `success: false`): Delegate to **sf-cli-upgrade-error-fixer** subagent. Do not attempt to read or inspect the error details yourself. After resolution, retry the upgrade. Repeat this process for any new errors until upgrade succeeds or the error resolver reports the issue cannot be fixed.
 
-6. **On success**: Report upgrade results and instruct the user to open a **new chat session** and start the **sf-post-upgrade-build-repairer** agent to validate the build and fix any compilation errors. Do NOT automatically hand off or invoke the next agent.
+6. **Fix stale version references**: The CLI upgrade updates `packages.config` but often leaves behind stale references in `.csproj` and `web.config` for satellite packages (connectors, add-ons, etc.) that aren't individually listed in `packages.config`. These must be fixed before proceeding.
+
+   Run a subagent to perform these checks and fixes:
+
+   **a) Scan `.csproj` files** for `<Reference>` elements where `Version` or `<HintPath>` still contains the **source version** (e.g. `14.4.8144`) instead of the **target version** (e.g. `15.4.8625`):
+   - For each stale reference, verify the corresponding target-version package folder exists under `packages/` (e.g. `packages/Telerik.Sitefinity.Translations.15.4.8625/lib/net48/`)
+   - If the 15.4 package exists: update both the `Version` attribute and `<HintPath>` to point to the target version package
+   - If the 15.4 package does NOT exist: report it and skip — do not break the reference
+
+   **b) Scan `web.config` files** for `<bindingRedirect>` entries where `newVersion` still contains the **source version**:
+   - Update `oldVersion` range and `newVersion` to the target version (e.g. `0.0.0.0-15.4.8625.0` / `15.4.8625.0`)
+
+   **c) Verify**: After fixes, grep all `.csproj`, `web.config` and `app.config` files for the source version string. If any remain, report them.
+
+   > **Why this is needed**: The CLI upgrades NuGet packages via `packages.config`, but satellite Sitefinity assemblies (Amazon, AuditTrail, Azure, Diagnostics, Translations, RecycleBin, connectors, etc.) are often referenced directly in `.csproj` without a corresponding `packages.config` entry. The CLI has no visibility into these, leaving stale assembly versions and HintPaths that cause runtime `FileLoadException` (HRESULT 0x80131040) due to version mismatches.
+
+7. **On success**: Report upgrade results and instruct the user to open a **new chat session** and start the **sf-post-upgrade-build-repairer** agent to validate the build and fix any compilation errors. Do NOT automatically hand off or invoke the next agent.
