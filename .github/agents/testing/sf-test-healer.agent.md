@@ -63,14 +63,21 @@ Your workflow:
    - For inherently dynamic data, utilize regular expressions to produce resilient locators
    - **Never hardcode absolute URLs** in `page.goto()` calls (e.g., `https://example.com/contact`). Always use relative paths (e.g., `page.goto('/contact')`). The `baseURL` is configured in `playwright.config.ts` from `settings.json`. If you find hardcoded absolute URLs while healing, replace them with relative paths.
    - After the first run of the tests it is normal that all VRT tests will fail as the first run generated the snapshots. Dont suggest running command that generates snapshots again directly after the first run as part of the healing proess. You can suggest that down the healing loop if needed, but not directly after the first run.
-9. **Verification**: Restart the test after each fix to validate the changes
-10. **Iteration**: Repeat the investigation and fixing process until all frontend tests pass cleanly
-11. **Regenerate Backend VRT Snapshots**: Once frontend tests pass, run `npx playwright test --project=vrt-backend --update-snapshots` to regenerate all backend visual regression snapshots. This ensures backend VRT baselines are up-to-date before running full test suite. Explain to the user why this command is needed.
-12. **Run Backend Tests**: Run backend tests using `test_run` with location `tests/backend`. Since backend VRT snapshots were regenerated in step 11, focus on healing any functional test failures.
-13. **Backend Test Healing**: If any backend tests fail, try to understand why, report the failing tests and the supposed reason. Ask the user if any healing is required for these tests or if they should be skipped with `test.fixme()`.
-14. **Final Summary**: Provide final summary of the test results and advise to user to proceed with the upgrade if the condition of the tests is satisfactory.
+9. **Utility-Level Fixes** — When a test cannot be stabilized through test code changes alone (e.g., dynamic carousels that prevent consistent VRT captures, persistent timing issues, recurring trial screen race conditions), **do not give up or mark as fixme immediately**. Instead:
+   - Read `tests/frontend/utils.ts`, `tests/backend/utils.ts`, and `tests/utils/playwright-utils.ts`
+   - Identify whether a shared utility can solve the problem (e.g., a `stopCarousels()` call, a `waitForAnimations()` helper, a mutation observer that freezes dynamic content before screenshots)
+   - If a suitable utility doesn't exist, **create it** in `tests/utils/playwright-utils.ts` and export it through the appropriate `utils.ts`
+   - Apply the new utility in the failing test(s)
+   - Only fall back to `test.fixme()` if the utility approach also fails after implementation
+10. **Verification**: Restart the test after each fix to validate the changes
+11. **Iteration**: Repeat the investigation and fixing process until all frontend tests pass cleanly
+12. **Regenerate Backend VRT Snapshots**: Once frontend tests pass, run `npx playwright test --project=vrt-backend --update-snapshots` to regenerate all backend visual regression snapshots. This ensures backend VRT baselines are up-to-date before running full test suite. Explain to the user why this command is needed.
+13. **Run Backend Tests**: Run backend tests using `test_run` with location `tests/backend`. Since backend VRT snapshots were regenerated in step 12, focus on healing any functional test failures.
+14. **Backend Test Healing**: If any backend tests fail, try to understand why, report the failing tests and the supposed reason. Ask the user if any healing is required for these tests or if they should be skipped with `test.fixme()`.
+15. **Final Summary**: Provide final summary of the test results and advise to user to proceed with the upgrade if the condition of the tests is satisfactory.
 
 Key principles:
+- **Utility files are in scope** — `tests/utils/playwright-utils.ts`, `tests/frontend/utils.ts`, and `tests/backend/utils.ts` can and should be modified or extended when test-level fixes are insufficient. Creating new shared helpers is preferred over repeating workarounds in individual test files.
 - **Regenerate backend VRT snapshots first** using `npx playwright test --project=vrt-backend --update-snapshots` before healing
 - **Always report test results summary** after each `test_run` execution (passed/failed/skipped counts + failed test names)
 - **NEVER remove Visual Regression Testing (VRT) tests or screenshot assertions** - they are critical quality safeguards

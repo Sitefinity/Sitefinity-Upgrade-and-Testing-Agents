@@ -83,6 +83,34 @@ Read these files:
 
 ---
 
+## Test Mix Strategy
+
+Apply this logic when interpreting test plans:
+
+### Mode A — Only a test count is specified (no pages, no workflows)
+Default behavior: **70% VRT / 30% functional**.
+- For N tests: generate `floor(N * 0.7)` VRT tests across `floor(N * 0.7)` **distinct pages** (1 VRT per page), then `N - floor(N * 0.7)` functional tests targeting high-value interactions on a subset of those same pages.
+- Crawl site navigation to discover enough pages to fill the VRT quota.
+- Example: 50 tests → 35 VRT on 35 pages + 15 functional tests (forms, navigation flows, key CTAs) spread across those pages.
+- **If crawling yields fewer unique pages than the VRT quota**: generate VRT for every discovered page, do NOT duplicate. Inform the user how many pages were found, how many tests were generated, and ask whether that is sufficient or if they want to point to additional pages/sections to reach the original count.
+
+### Mode B — Specific pages/workflows listed, plus an additional default count
+Generate the explicitly listed pages/workflows **first**, then generate exactly N additional tests on top using the 70/30 default behavior.
+- Every explicitly named page gets a VRT test + any described functional tests.
+- N is the number stated in the plan for the additional default tests — it is additive, not a total cap.
+- Pages already covered by explicit tests are excluded from the crawl pool for the additional N — no duplicates.
+
+### Mode C — Only specific pages/workflows listed (no default count)
+Ignore the 70/30 ratio. Test exactly what is listed — nothing more.
+- **Every unique page mentioned still gets exactly 1 VRT test.**
+- Each described workflow/interaction gets a functional test.
+- Do not crawl for extra pages.
+
+### Rule that applies to ALL modes
+Every distinct page that appears in the test suite must have **at least 1 `toHaveScreenshot()` test**. This is non-negotiable.
+
+---
+
 ## STEP 3: Confirm Understanding with User
 
 **CRITICAL**: Before starting test generation, you MUST communicate back to the user what you understood from the test plans and wait for confirmation.
@@ -118,7 +146,7 @@ Test multisite - verify all subsites work correctly
 4. **Detail pages**: Test only ONE instance when URL patterns are similar (e.g., `/blog/post-1`, `/blog/post-2`)
 5. **Domain scope**: Only test URLs matching base domain from workspace configuration (skip external redirects)
 6. **Multisite**: If mentioned, navigate to `{SitefinityUrl}/Sitefinity/Multisite/MultisiteManagement`. You will see listed sites. Use each sites "View" button to open the respective site and execute the necessary testing.
-7. **VRT + Interactions**: All tests must include `toHaveScreenshot()` and assertions (`toBeVisible()`, `toContainText()`, etc.)
+7. **VRT tests**: Must call `toHaveScreenshot()`. Functional tests must have meaningful assertions (`toBeVisible()`, `toContainText()`, link `href` checks, etc.) but do NOT need a screenshot — keep them focused on behavior, not appearance.
 8. **VRT viewport**: Use `browser_resize` to set viewport to 1920x1080 before taking any screenshots for consistency
 
 ---

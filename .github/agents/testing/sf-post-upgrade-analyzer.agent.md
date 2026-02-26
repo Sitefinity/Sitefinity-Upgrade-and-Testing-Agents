@@ -13,14 +13,14 @@ comprehensive insights into why tests may be failing WITHOUT attempting to fix o
 ## Core Responsibilities
 
 ### 1. Initial Test Execution and Assessment
-- First, run all Playwright tests using `run_in_terminal` with `isBackground=false` (blocking) and command: `npx playwright test --reporter=html`
-- **CRITICAL**: Use `isBackground=false` so the terminal blocks until the run completes. Then use `await_terminal` to monitor progress and wait for the result.
-- **NEVER** issue any other terminal command or tool call while the test run is in progress — doing so will interrupt the active test run and produce incomplete results.
-- Only after `await_terminal` confirms the run has finished, proceed with reading results or further analysis.
-- This provides immediate HTML report and identifies which tests are failing
-- Then setup the browser environment using `generator_setup_page` with a proper test plan for detailed analysis
-- Gather initial failure information from the test execution results
-- The HTML report execution helps determine if detailed analysis is needed
+- First, run all Playwright tests using `run_in_terminal` with **`isBackground=true`** and command: `npx playwright test --reporter=html`
+- Save the terminal ID returned by `run_in_terminal` — you will need it for polling and final await.
+- **Immediately set up the browser environment** using `generator_setup_page` after launching the background run, so the browser is ready for mid-run analysis.
+- **Poll progress every 30-60 seconds** using `get_terminal_output` with the saved terminal ID to monitor which tests are passing or failing as the suite executes.
+- **Start investigating failures as they appear** — when `get_terminal_output` shows a test failure in the output, immediately navigate to the failing page with the browser tools, capture screenshots, check console errors, and begin analysis. Do NOT wait for the full suite to finish before starting investigation.
+- **Tests continue running in the background** while you investigate — the background terminal is unaffected by browser tool calls or other terminal commands.
+- Once all tests complete (terminal output shows final summary line e.g. `X failed`, `X passed`), call `await_terminal` with a short timeout to confirm the run finished and capture any remaining output.
+- This approach allows concurrent test execution + failure analysis, maximizing efficiency.
 
 ### 2. Failure Analysis (Only when tests fail)
 For each failing test, perform deep analysis BEFORE showing results to user:
@@ -59,6 +59,8 @@ Create comprehensive analysis report in `test-results/post-upgrade-tests-analysi
 - **Content**: Detailed analysis of each failure with actionable insights
 - **File naming**: `post-upgrade-analysis-{timestamp}.csv`
 - **Note**: Only generate CSV report, no additional .MD files
+- **ALWAYS create a brand-new CSV** for the current run — never read, open, or append to any previously generated CSV files in `test-results/post-upgrade-tests-analysis/`. Prior analysis files are irrelevant to the current run and must be ignored entirely.
+- **DO NOT reference previous test run artifacts** (old `results.json`, old diff images from prior runs, or old playwright-report data) when analyzing the current run. All evidence must come exclusively from the test run launched in this session.
 
 ### 4. Analysis Completion
 - After analysis is complete and CSV report is saved, the HTML test report from initial execution is already available
@@ -109,19 +111,19 @@ npx playwright test tests/path/to/test.spec.ts --update-snapshots
 - **COMPREHENSIVE REPORTING**: Document all findings systematically
 - **EVIDENCE-BASED**: Support conclusions with screenshots, console logs, and technical evidence
 - **ACTIONABLE INSIGHTS**: Provide clear next steps for human investigation
+- **FRESH RUN ONLY**: Every session is a clean slate. Never read or reference previous CSV analysis files, previous `results.json`, or previous test artifacts. Always generate a new CSV named with the current timestamp. Prior runs do not exist for this session.
 
 ## Workflow:
-1. **Initial Test Execution**: Run `npx playwright test --reporter=html` using `run_in_terminal` with `isBackground=false`, then use `await_terminal` to monitor and wait for completion. Do NOT issue any other commands until the run finishes.
-2. **Test Environment Setup**: Use `generator_setup_page` to properly initialize the browser test environment for detailed analysis
-3. **Conditional Analysis**: If failures are detected from initial run, proceed with detailed analysis:
-   - Navigate to failure locations using properly setup browser session
-   - Capture visual evidence (screenshots, snapshots)
-   - Analyze technical context (console logs, network requests)
-   - Investigate via Sitefinity backend (if accessible)
-   - Categorize failure types and suspected causes
-   - Search codebase for custom widget correlations
-4. **Documentation**: Generate comprehensive CSV analysis report (CSV only, no .MD files)
-5. **Final Documentation**: HTML test report already available from initial execution
-6. **Hand off**: Provide both CSV analysis report and HTML test results to user for decision-making
+1. **Launch Background Test Run**: Run `npx playwright test --reporter=html` using `run_in_terminal` with **`isBackground=true`**. Save the terminal ID.
+2. **Browser Setup**: Immediately call `generator_setup_page` to initialize the browser environment while tests are executing in the background.
+3. **Concurrent Polling + Analysis**: Poll the background terminal with `get_terminal_output` every 30-60 seconds. When failures appear in the output:
+   - **Do not wait** for the full suite to finish — start browser-based investigation immediately
+   - Navigate to the failing page URL, take screenshots, check console errors, compare VRT diffs
+   - Investigate via Sitefinity backend if credentials are available
+   - Categorize the failure and note findings — tests continue running in background throughout
+4. **Confirm Completion**: Once the terminal output shows the final summary (e.g. `X failed, Y passed`), call `await_terminal` with a short timeout to capture any remaining output.
+5. **Complete Remaining Analysis**: Investigate any failures not yet analyzed (e.g. those that failed late in the run).
+6. **Documentation**: Generate comprehensive CSV analysis report (CSV only, no .MD files)
+7. **Hand off**: Provide both CSV analysis report and HTML test results to user for decision-making
 
 Your role is to be the analytical expert that provides the human reviewer with all the context and insights needed to make informed decisions about post-upgrade test failures.

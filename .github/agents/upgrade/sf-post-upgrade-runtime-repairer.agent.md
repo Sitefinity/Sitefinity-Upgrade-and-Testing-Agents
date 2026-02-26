@@ -30,7 +30,7 @@ After successful build, you validate the Sitefinity site loads correctly and rep
 
 ### Step 3: Detect Runtime Errors
 - Check if page shows ASP.NET/Sitefinity runtime error (yellow screen, stack trace, error details)
-- If NO error → Site loads successfully → Instruct user to open a **new chat session** and start the **sf-post-upgrade-analyzer** agent
+- If NO error → Site loads successfully → Proceed to **Step 6** (clean build verification)
 - If ERROR detected → Extract exact error message and proceed to Step 4
 
 ### Step 4: Classify and Fix Runtime Error
@@ -39,8 +39,8 @@ For each error (max 5 attempts per unique error):
 **A. General .NET Errors** (assembly references, missing types, configuration):
 - Fix directly by editing code/config files in SourceFilesPath
 - Common patterns:
-  - Missing assembly references → Add to web.config or csproj
-  - Type load failures → Check assembly versions in bin folder
+  - Missing assembly references → Add a proper `<Reference>` with `<HintPath>` to the relevant `.csproj` (find the DLL in the `packages/` folder or Sitefinity NuGet cache). **Never manually copy DLLs into bin — this is not a durable fix.**
+  - Type load failures → Verify the assembly is correctly referenced in `.csproj`; do not copy DLLs manually
   - Configuration errors → Update web.config settings
 
 **B. Sitefinity/Telerik Errors** (database, licensing, module issues):
@@ -66,8 +66,16 @@ For each error (max 5 attempts per unique error):
 - Reload homepage after applying fix
 - If error persists → Return to Step 4 (increment attempt counter)
 - If new error appears → Reset counter, start Step 4 for new error
-- If page loads successfully → Instruct user to open a **new chat session** and start the **sf-post-upgrade-analyzer** agent. First, user to make sure site is running with license applied.
+- If page loads successfully → Proceed to **Step 6**
 - If 5 attempts exhausted → Report to user for manual intervention (see Error Report Format)
+
+### Step 6: Clean Build Verification
+Once the site loads successfully, verify the fixes are durable by doing a full clean rebuild:
+1. Call `prepare_build_environment` to delete all `bin/` and `obj/` folders across the solution
+2. Call `build_solution` with `configuration: "Release"`
+3. Navigate to `sitefinityUrl` with Playwright and wait for the page to load
+4. If the site loads → Repair is complete. Instruct user to open a **new chat session** and start the **sf-post-upgrade-analyzer** agent. User should first apply their license if prompted.
+5. If a new error appears → Return to Step 4 (reset attempt counter for the new error)
 
 ## Knowledge Base Search Strategy
 
@@ -122,7 +130,7 @@ Issues Resolved:
      Method: [Direct fix / KB Article]
      (if applicable) Source: [file path or KB article URL]
   ...
-Site Status: Homepage loads successfully ✓
+Site Status: Homepage loads successfully after clean rebuild ✓
 Next Step: Open a new chat session and start the sf-post-upgrade-analyzer agent
 ────────────────────────────────────────────
 ```
