@@ -55,11 +55,11 @@ const config = getSitefinityConfig();
 /**
  * Sitefinity Upgrade Verification - Playwright Configuration
  * 
- * IMPORTANT: Backend tests MUST run with a single worker due to Sitefinity's 
- * single-session-per-user restriction. Multiple concurrent logins will cause
- * "User already logged in" errors and session conflicts.
+ * Backend tests authenticate via the ensureAuthFile() mutex in tests/backend/utils.ts.
+ * A single login is performed per 30-minute window and the session is shared across
+ * all workers via storageState — no per-test login overhead, safe for parallel execution.
  * 
- * Frontend tests can use multiple workers for faster execution.
+ * Frontend tests do not require authentication and run fully in parallel.
  */
 export default defineConfig({
   testDir: './tests',

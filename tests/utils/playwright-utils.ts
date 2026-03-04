@@ -94,6 +94,40 @@ export async function dismissSitefinityTrialScreen(page: Page): Promise<boolean>
   }
 }
 
+/**
+ * Wait for a Sitefinity backend content-list page to finish AJAX loading.
+ *
+ * The backend admin renders the h1 heading almost immediately (attached state),
+ * but populates the content grid asynchronously. Pages in a loading state are
+ * typically ~1107px tall; once the grid is populated they grow significantly.
+ *
+ * This helper waits until EITHER:
+ *   • the page scroll-height exceeds MIN_LOADED_HEIGHT (1200px), OR
+ *   • a recognisable grid row element appears in the DOM.
+ *
+ * It silently times out after `timeout` ms so tests can still proceed.
+ */
+export async function waitForSitefinityBackendListLoaded(page: Page, timeout = 15000): Promise<void> {
+  const MIN_LOADED_HEIGHT = 1200;
+  try {
+    await page.waitForFunction(
+      ({ minHeight }: { minHeight: number }) => {
+        // Page grew past the loading-state height
+        if (document.documentElement.scrollHeight > minHeight) return true;
+        // Or a Kendo/Sitefinity grid row appeared
+        const gridRow = document.querySelector(
+          '.k-grid-content tbody tr, .sfDataGrid tbody tr, table.sfItemsList tbody tr'
+        );
+        return !!gridRow;
+      },
+      { minHeight: MIN_LOADED_HEIGHT },
+      { timeout }
+    );
+  } catch {
+    // Best-effort — proceed even if we can't confirm the list is loaded
+  }
+}
+
 // ============================================================================
 // Stable Navigation & Interaction Wrappers
 // ============================================================================

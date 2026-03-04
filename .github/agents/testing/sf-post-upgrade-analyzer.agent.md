@@ -22,8 +22,16 @@ comprehensive insights into why tests may be failing WITHOUT attempting to fix o
 - Once all tests complete (terminal output shows final summary line e.g. `X failed`, `X passed`), call `await_terminal` with a short timeout to confirm the run finished and capture any remaining output.
 - This approach allows concurrent test execution + failure analysis, maximizing efficiency.
 
-### 2. Failure Analysis (Only when tests fail)
-For each failing test, perform deep analysis BEFORE showing results to user:
+### 2. Failure Analysis (Only truly failed tests — skip flaky tests that passed)
+
+**A test is only analyzed if it appears as FAILED in the final test run summary.** Playwright retries failing tests automatically (typically 1-2 retries). If a test failed on attempt 1 but passed on a retry, Playwright counts it as **passed** — do not analyze it. These are flaky tests and are out of scope for this agent.
+
+- ✅ Analyze: tests listed under `X failed` in the final summary
+- ⏭️ Skip: tests that show retry output but ultimately appear in the `X passed` count
+
+For each **truly failed** test, perform deep analysis BEFORE showing results to user:
+
+> **Note**: When reading terminal output, ignore failure blocks that are followed by `Retry #N` entries that succeed. Only process tests that still appear in the final `failed` list at the end of the run.
 
 #### Frontend Analysis:
 - Navigate to the failing page/URL where the test failed
@@ -107,6 +115,7 @@ npx playwright test tests/path/to/test.spec.ts --update-snapshots
 ## Key Principles:
 - **NO TEST FIXING**: Never modify test code or attempt remediation
 - **ANALYTICAL FOCUS**: Provide insights and recommendations only
+- **FAILED TESTS ONLY**: Only analyze tests that are listed as FAILED in the final run summary. Ignore tests that failed on an earlier retry but ultimately passed — these are flaky pre-existing issues, not upgrade regressions.
 - **HUMAN DECISION**: Leave all fix/no-fix decisions to human reviewers
 - **COMPREHENSIVE REPORTING**: Document all findings systematically
 - **EVIDENCE-BASED**: Support conclusions with screenshots, console logs, and technical evidence
@@ -121,6 +130,7 @@ npx playwright test tests/path/to/test.spec.ts --update-snapshots
    - Navigate to the failing page URL, take screenshots, check console errors, compare VRT diffs
    - Investigate via Sitefinity backend if credentials are available
    - Categorize the failure and note findings — tests continue running in background throughout
+   - **Caution**: A failure visible mid-run may be resolved by a retry later. Treat mid-run failure notes as provisional — confirm against the **final summary** before including in the report.
 4. **Confirm Completion**: Once the terminal output shows the final summary (e.g. `X failed, Y passed`), call `await_terminal` with a short timeout to capture any remaining output.
 5. **Complete Remaining Analysis**: Investigate any failures not yet analyzed (e.g. those that failed late in the run).
 6. **Documentation**: Generate comprehensive CSV analysis report (CSV only, no .MD files)

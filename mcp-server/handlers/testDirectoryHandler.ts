@@ -129,7 +129,7 @@ export async function scaffoldTestDirectoryHandler(args: {
       result.skipped.push("settings.json (already exists)");
     }
 
-    // Copy tests/ directory (predefined backend/frontend tests and shared utils)
+    // Copy tests/ directory (backend/frontend tests and shared utils)
     const sourceTestsPath = join(PROJECT_ROOT, "tests");
     const destTestsPath = join(testDir, "tests");
     if (existsSync(sourceTestsPath)) {
@@ -139,7 +139,7 @@ export async function scaffoldTestDirectoryHandler(args: {
           force: false, // Don't overwrite existing files
           errorOnExist: false
         });
-        result.created.push("tests/ (copied predefined tests from upgrade-and-testing)");
+        result.created.push("tests/ (copied tests from upgrade-and-testing)");
       } catch (error) {
         // If files already exist, that's okay
         result.skipped.push("tests/ (some or all files already exist)");
