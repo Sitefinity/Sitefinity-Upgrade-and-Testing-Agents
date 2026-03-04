@@ -60,18 +60,20 @@ const config = loadSitefinityConfig();
 /**
  * Sitefinity Upgrade Verification - Playwright Configuration
  * 
- * IMPORTANT: Backend tests MUST run with a single worker due to Sitefinity's 
- * single-session-per-user restriction. Multiple concurrent logins will cause
- * "User already logged in" errors and session conflicts.
+ * Backend tests authenticate via the ensureAuthFile() mutex in tests/backend/utils.ts.
+ * A single login is performed per 30-minute window and the session is shared across
+ * all workers via storageState — no per-test login overhead, safe for parallel execution.
  * 
- * Frontend tests can use multiple workers for faster execution.
+ * Frontend tests do not require authentication and run fully in parallel.
  */
 export default defineConfig({
   testDir: './tests',
   fullyParallel: false, // Projects override this individually
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 1, // Retry once for flaky tests
-  workers: process.env.CI ? 1 : undefined, // Let projects control workers, CI uses 1 for stability
+  // Default worker count (50% of CPU cores). CI uses 1 for stability.
+  // Backend tests are safe for parallel execution thanks to the ensureAuthFile() mutex.
+  workers: process.env.CI ? 1 : undefined,
   timeout: 90000, // 90s per test timeout - increased for session handling
   outputDir: 'test-artifacts',
   grep: process.env.GREP ? new RegExp(process.env.GREP) : undefined,
@@ -97,13 +99,14 @@ export default defineConfig({
     {
       name: 'backend-chromium',
       testDir: './tests/backend',
+      testIgnore: /-vrt\.spec\.ts$/,
       snapshotPathTemplate: './snapshots/backend/{testFilePath}-snapshots/{arg}{ext}',
       use: { 
         ...devices['Desktop Chrome'],
         viewport: { width: 1920, height: 1080 },
       },
-      // CRITICAL: Backend tests MUST run sequentially with single worker
-      // Sitefinity only allows one active session per user account
+      // Auth is handled by the page fixture in tests/backend/utils.ts via ensureAuthFile().
+      // No setup project needed. fullyParallel:false keeps tests within a file sequential.
       fullyParallel: false,
     },
     {
@@ -121,15 +124,15 @@ export default defineConfig({
     {
       name: 'vrt-backend',
       testDir: './tests/backend',
-      testMatch: '**/*vrt*.spec.ts', // Match all backend tests with 'vrt' in the name
+      testMatch: '**/*vrt*.spec.ts',
+      testIgnore: 'auth.setup.ts',
       snapshotPathTemplate: './snapshots/backend/{testFilePath}-snapshots/{arg}{ext}',
       use: { 
         ...devices['Desktop Chrome'],
         viewport: { width: 1920, height: 1080 },
       },
-      // VRT snapshots should be generated sequentially for consistency
       fullyParallel: false,
-    }
+    },
   ],
   
   /* Expect settings for visual comparisons */

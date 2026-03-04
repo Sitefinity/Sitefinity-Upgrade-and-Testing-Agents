@@ -1,4 +1,4 @@
-import { test as base, expect, Page, Dialog } from '@playwright/test';
+import { test as base, expect, Page, Dialog, Browser } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
@@ -16,6 +16,7 @@ export {
   waitForSelectorWithRetries,
   expectVisibleWithRetries,
   assertEndpoint,
+  waitForSitefinityBackendListLoaded,
   EXTERNAL_TAG,
 } from '../utils/playwright-utils.js';
 
@@ -30,13 +31,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 /**
- * Global session management to handle worker-specific sessions
+ * Global session management
  * 
- * CRITICAL: Sitefinity only allows ONE active session per user account.
- * When multiple tests try to login simultaneously, all but one will see
- * "User already logged in" errors. This is by design in Sitefinity.
- * 
- * Solution: Tests MUST run sequentially (workers: 1) to prevent conflicts.
+ * Sitefinity only allows ONE active session per user account. The ensureAuthFile()
+ * mutex performs a single login per 30-minute window and persists the session to
+ * backend-auth.json. All workers restore from this file via storageState, so
+ * backend tests run in parallel without session conflicts.
  */
 
 /**
@@ -173,6 +173,70 @@ export const defaultConfig: SitefinityConfig = {
 export const isSitefinityTrialScreenVisible = _isOverlayVisible;
 export const dismissSitefinityTrialScreen = _dismissOverlay;
 
+// ── Backend auth session management ──────────────────────────────────────────
+// Login is performed once (per 30-min window) and the session is persisted to
+// a JSON file. All backend test contexts restore from this file so no per-test
+// login round-trip is needed. An atomic file lock prevents concurrent logins
+// when the MCP test runner launches multiple workers simultaneously.
+export const AUTH_FILE = path.join(__dirname, '../../test-artifacts/backend-auth.json');
+const AUTH_LOCK_FILE = AUTH_FILE + '.lock';
+const AUTH_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
+
+/**
+ * Ensure the backend auth JSON exists and is fresh.
+ * Uses an atomic exclusive-create lock so only one worker ever logs in;
+ * others wait until the winner writes the file then continue.
+ */
+async function ensureAuthFile(browser: Browser, baseURL?: string): Promise<void> {
+  // ① Fresh file already present — nothing to do.
+  if (fs.existsSync(AUTH_FILE)) {
+    const ageMs = Date.now() - fs.statSync(AUTH_FILE).mtimeMs;
+    if (ageMs < AUTH_MAX_AGE_MS) return;
+  }
+
+  // ② Try to acquire the lock via atomic exclusive file create.
+  let gotLock = false;
+  try {
+    fs.mkdirSync(path.dirname(AUTH_LOCK_FILE), { recursive: true });
+    const fd = fs.openSync(AUTH_LOCK_FILE, 'wx'); // EEXIST if another process holds it
+    fs.closeSync(fd);
+    gotLock = true;
+  } catch {
+    // Another worker is already logging in — wait for the auth file to appear.
+    console.log('[ensureAuthFile] Another worker is logging in — waiting...');
+    const deadline = Date.now() + 120_000;
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, 1000));
+      if (fs.existsSync(AUTH_FILE)) {
+        console.log('[ensureAuthFile] Auth file appeared — proceeding.');
+        return;
+      }
+    }
+    throw new Error('[ensureAuthFile] Timed out waiting for backend-auth.json to be created by another worker');
+  }
+
+  // ③ We hold the lock — re-check then do the login.
+  try {
+    if (fs.existsSync(AUTH_FILE)) {
+      const ageMs = Date.now() - fs.statSync(AUTH_FILE).mtimeMs;
+      if (ageMs < AUTH_MAX_AGE_MS) return; // Written while we waited for the lock
+    }
+    console.log('[ensureAuthFile] Logging in to Sitefinity to create auth session...');
+    fs.mkdirSync(path.dirname(AUTH_FILE), { recursive: true });
+    const ctx = await browser.newContext(baseURL ? { baseURL } : {});
+    const pg = await ctx.newPage();
+    try {
+      await loginToSitefinity(pg);
+      await ctx.storageState({ path: AUTH_FILE });
+      console.log(`[ensureAuthFile] Auth state saved → ${AUTH_FILE}`);
+    } finally {
+      await ctx.close();
+    }
+  } finally {
+    try { fs.rmSync(AUTH_LOCK_FILE, { force: true }); } catch { /* ignore */ }
+  }
+}
+
 /**
  * Extended Playwright test fixture with automatic trial screen handling for backend tests
  * 
@@ -184,31 +248,39 @@ export const dismissSitefinityTrialScreen = _dismissOverlay;
  *   // Trial screens are automatically handled during admin navigation
  * });
  */
-export const test = base.extend<{ page: Page }>({
-  page: async ({ page: originalPage }, use) => {
-    // Enhanced goto: domcontentloaded → dismiss overlays → wait for images (2s cap)
+export const test = base.extend<{ page: Page }>({  
+  page: async ({ browser, baseURL }, use) => {
+    // Ensure the shared auth session file exists (performs login if needed).
+    // The ensureAuthFile mutex prevents concurrent logins across workers.
+    await ensureAuthFile(browser, baseURL);
+
+    // Create a fresh context pre-loaded with saved cookies — no login round-trip.
+    const context = await browser.newContext({
+      ...(baseURL ? { baseURL } : {}),
+      storageState: AUTH_FILE,
+    });
+    const page = await context.newPage();
+
+    // ── Enhanced goto: domcontentloaded → dismiss overlays → wait for images ──
     // networkidle is intentionally omitted (can hang on long-polling sites).
-    // waitForImagesToLoad ensures layout is settled for VRT screenshots.
-    // NOTE: No background setInterval — trial screen is handled inline on goto/click
-    // to avoid racing with test actions and causing mid-test navigations.
-    const originalGoto = originalPage.goto.bind(originalPage);
-    originalPage.goto = async (url: string, options?: Parameters<Page['goto']>[1]) => {
+    const originalGoto = page.goto.bind(page);
+    page.goto = async (url: string, options?: Parameters<Page['goto']>[1]) => {
       const response = await originalGoto(url, { waitUntil: 'domcontentloaded', ...options });
-      await dismissSitefinityTrialScreen(originalPage);
-      await waitForImagesToLoad(originalPage); // 2s best-effort
+      await dismissSitefinityTrialScreen(page);
+      await waitForImagesToLoad(page); // 2s best-effort
       return response;
     };
 
-    // Enhanced click: short delay + overlay dismissal
-    const originalClick = originalPage.click.bind(originalPage);
-    originalPage.click = async (selector: string, options?: Parameters<Page['click']>[1]) => {
+    // ── Enhanced click: short delay + overlay dismissal ──────────────────────
+    const originalClick = page.click.bind(page);
+    page.click = async (selector: string, options?: Parameters<Page['click']>[1]) => {
       await originalClick(selector, options);
-      await originalPage.waitForTimeout(1000);
-      await dismissSitefinityTrialScreen(originalPage);
+      await page.waitForTimeout(1000);
+      await dismissSitefinityTrialScreen(page);
     };
 
-    // Use the enhanced page object
-    await use(originalPage);
+    await use(page);
+    await context.close();
   },
 });
 
@@ -348,15 +420,44 @@ export async function loginToSitefinity(page: Page, config: SitefinityConfig = d
       await page.waitForTimeout(500);
       
       // Click login and wait for navigation
-      const loginButton = page.getByRole('link', { name: 'Log in' });
-      
+      // Try multiple strategies to find the submit button (handles different languages/skins).
+      // Sitefinity may render the login button as a <button>, <input type="submit">,
+      // or an ASP.NET WebForms <a href="javascript:__doPostBack(...)"> link.
+      const loginButtonCandidates = [
+        // ASP.NET WebForms postback link (e.g. Sitefinity login page)
+        page.getByRole('link', { name: /log in/i }),
+        page.getByRole('link', { name: /sign in/i }),
+        page.locator('a[href*="doPostBack"]'),
+        // Standard button/input variants
+        page.getByRole('button', { name: /log in/i }),
+        page.getByRole('button', { name: /sign in/i }),
+        page.locator('button[type="submit"]'),
+        page.locator('input[type="submit"]'),
+      ];
+      let loginButton: ReturnType<Page['locator']> | null = null;
+      for (const candidate of loginButtonCandidates) {
+        if (await candidate.isVisible({ timeout: 1000 }).catch(() => false)) {
+          loginButton = candidate;
+          console.log('Found login button via candidate selector');
+          break;
+        }
+      }
+      if (!loginButton) {
+        console.log('Could not find login button via any candidate, falling back to first visible link/button');
+        // Last-resort: grab any visible link that triggers a postback, or first submit
+        const postbackLink = page.locator('a[href*="doPostBack"]').first();
+        loginButton = await postbackLink.isVisible({ timeout: 1000 }).catch(() => false)
+          ? postbackLink
+          : page.locator('button[type="submit"], input[type="submit"]').first();
+      }
+
       // Capture current URL to detect navigation
       const beforeUrl = page.url();
       
       // Use Promise.all to handle navigation that may or may not happen
       try {
         await Promise.all([
-          page.waitForURL(url => !url.toString().includes('/Login'), { timeout: 15000 }),
+          page.waitForURL(url => !url.toString().toLowerCase().includes('/login'), { timeout: 15000 }),
           loginButton.click()
         ]);
       } catch (navigationError) {
@@ -431,9 +532,9 @@ export async function loginToSitefinity(page: Page, config: SitefinityConfig = d
  * Handle the self-logout page when another user session exists
  * Enhanced for Sitefinity stricter session management
  * 
- * NOTE: With sequential execution (workers: 1), self-logout should be rare.
- * It mainly occurs when tests don't properly clean up or when running
- * tests while someone is logged into the admin manually.
+ * NOTE: With the ensureAuthFile() mutex, self-logout should be rare since all
+ * workers share a single session. It mainly occurs when running tests while
+ * someone is logged into the admin manually.
  */
 async function handleSelfLogoutPage(page: Page, config: SitefinityConfig): Promise<void> {
   console.log('Self-logout page detected - another session exists');
@@ -442,11 +543,13 @@ async function handleSelfLogoutPage(page: Page, config: SitefinityConfig): Promi
   try {
     // Multiple possible selectors for the self-logout link
     const selfLogoutSelectors = [
+      'a:has-text("Log the other user off and enter")',
       'a:has-text("Log the other user out and enter")',
       'a[href*="selfLogoutButton"]',
+      '[id*="selfLogoutButton"]',
+      'a:has-text("Log the other user off")',
       'a:has-text("Log the other user out")',
-      'input[value*="Log the other user out"]',
-      '[id*="selfLogoutButton"]'
+      'input[value*="Log the other user"]',
     ];
     
     let selfLogoutElement = null;
@@ -548,8 +651,8 @@ async function verifyDashboardAccess(page: Page, config: SitefinityConfig): Prom
  * Clean up any existing sessions to prevent conflicts
  * Call this at the beginning of each test for clean state
  * 
- * NOTE: Since tests run sequentially with workers: 1, this is mainly for 
- * ensuring a clean slate between tests, not for parallel isolation.
+ * NOTE: Since all workers share a single authenticated session via ensureAuthFile(),
+ * this is mainly for ensuring a clean slate between tests.
  */
 export async function cleanupSitefinitySessions(page: Page, config: SitefinityConfig = defaultConfig): Promise<void> {
   console.log('Cleaning up Sitefinity sessions...');

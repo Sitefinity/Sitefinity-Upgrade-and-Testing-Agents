@@ -1,6 +1,6 @@
 ---
 name: sf-test-generator
-description: Generates Playwright tests for Sitefinity upgrade verification. Creates VRT and interaction tests for both frontend (dynamic) and backend (predefined + custom).
+description: Generates Playwright tests for Sitefinity upgrade verification. Creates VRT and interaction tests for both frontend and backend.
 tools:
   ['execute/getTerminalOutput', 'execute/killTerminal', 'execute/runInTerminal', 'read/readFile', 'edit', 'search', 'playwright-test/browser_click', 'playwright-test/browser_drag', 'playwright-test/browser_evaluate', 'playwright-test/browser_file_upload', 'playwright-test/browser_handle_dialog', 'playwright-test/browser_hover', 'playwright-test/browser_navigate', 'playwright-test/browser_navigate_back', 'playwright-test/browser_press_key', 'playwright-test/browser_resize', 'playwright-test/browser_select_option', 'playwright-test/browser_snapshot', 'playwright-test/browser_type', 'playwright-test/browser_verify_element_visible', 'playwright-test/browser_verify_list_visible', 'playwright-test/browser_verify_text_visible', 'playwright-test/browser_verify_value', 'playwright-test/browser_wait_for', 'playwright-test/generator_read_log', 'playwright-test/generator_setup_page', 'playwright-test/generator_write_test']
 model: Claude Sonnet 4.6
@@ -13,14 +13,12 @@ You are a Playwright Test Generator that creates **Visual Regression Tests (VRT)
 ## Testing Strategy Overview
 
 ### Backend Testing (Sitefinity Admin)
-- **Predefined tests exist** in `tests/backend/` folder
-- These work for 99% of Sitefinity sites since the admin UI is consistent
-- If `test-plans/backend/plan.md` exists, user wants **additional custom backend tests**
-- Custom backend tests go in a **NEW** spec file under `tests/backend/`
+- **Read** `test-plans/backend/plan.md` to understand what to test
+- Generate tests under `tests/backend/`
 
 ### Frontend Testing (Site Frontend)
-- **Cannot be predefined** - each project's frontend is different
-- **Read** `test-plans/frontend/plan.md` to understand what to test. Follow the test plan strictly and dont do anything outside of it. Generate the exact number of tests requested by the user.
+- Each project's frontend is different
+- **Read** `test-plans/frontend/plan.md` to understand what to test. Follow the test plan strictly and don't do anything outside of it. Generate the exact number of tests requested by the user.
 
 ---
 
@@ -44,21 +42,32 @@ test.describe('My Feature Tests', () => {
 > **NEVER hardcode absolute URLs** (e.g., `https://example.com/contact`) in `page.goto()` calls. Always use **relative paths** (e.g., `page.goto('/contact')`). The `baseURL` is read from `settings.json` via `playwright.config.ts` and applied automatically. Hardcoded URLs break portability across environments (local, staging, production).
 
 ### Backend Tests  
-**ALWAYS** use the custom test fixtures for backend tests to handle Sitefinity trial screens automatically:
+**ALWAYS** use the custom test fixtures for backend tests. Authentication and trial screen handling are **fully automatic** — no explicit login call needed:
 
 ```typescript
-import { test, expect, loginToSitefinity } from './utils';
+import { test, expect, waitForSitefinityBackendListLoaded } from './utils';
 
 test.describe('Admin Tests', () => {
-  test('admin test', async ({ page }) => {
-    await loginToSitefinity(page);
-    // The page fixture automatically handles trial screens during admin navigation
-    // No manual trial screen handling needed
+  test('admin list VRT', async ({ page }) => {
+    await page.goto('/Sitefinity/some-module');
+    await page.waitForSelector('h1', { state: 'attached', timeout: 60000 });
+    // Wait for AJAX list/grid to populate before taking a screenshot
+    await waitForSitefinityBackendListLoaded(page);
+    await expect(page).toHaveScreenshot('some-module.png');
+  });
+
+  test('admin functional test', async ({ page }) => {
+    await page.goto('/Sitefinity/dashboard');
+    // page is already authenticated — interact directly
   });
 });
 ```
 
-**WHY**: Sitefinity trial version screens can appear randomly during BOTH frontend AND backend tests. The custom fixtures in both `tests/frontend/utils.ts` and `tests/backend/utils.ts` provide automatic detection and dismissal of trial screens, preventing test failures.
+**WHY (auth-before-all mechanism)**: The `page` fixture in `tests/backend/utils.ts` uses an atomic mutex (`ensureAuthFile`) to perform a **single login per 30-minute window**, shared across all workers. The saved session is restored from `test-artifacts/backend-auth.json` via `storageState`. Every test gets a fresh authenticated context with zero login overhead. **Never call `loginToSitefinity(page)` manually in backend tests** — the fixture already handles this.
+
+**WHY (`waitForSitefinityBackendListLoaded`)**: Sitefinity backend list pages load their content grids asynchronously via AJAX. Without waiting, screenshots are taken at Sitefinity's default ~1107px loading-state height before the grid populates — producing stale baselines. This utility waits for `scrollHeight > 1200px` OR presence of `.k-grid-content tbody tr`, `.sfDataGrid tbody tr`, or `table.sfItemsList tbody tr` before proceeding. Always call it before `toHaveScreenshot()` on any backend list/grid page.
+
+**WHY (trial screens)**: Sitefinity trial version screens can appear randomly during BOTH frontend AND backend tests. The custom fixtures in both `tests/frontend/utils.ts` and `tests/backend/utils.ts` provide automatic detection and dismissal of trial screens, preventing test failures.
 
 **DO NOT** import from `@playwright/test` for ANY tests. Always import from `./utils` in both directories.
 
@@ -117,7 +126,7 @@ Every distinct page that appears in the test suite must have **at least 1 `toHav
 
 ### What to Communicate:
 1. **Frontend Test Plan Summary**: List each page/feature/interaction you plan to test
-2. **Backend Test Plan Summary**: List any custom backend tests (beyond predefined tests)
+2. **Backend Test Plan Summary**: List the backend tests you plan to generate
 3. **Total Test Count Estimate**: Concrete number of test files you will generate and concrete number of tests (if these were specified in the plans)
 
 **DO NOT PROCEED** with test generation until the user confirms or provides corrections.
@@ -153,15 +162,10 @@ Test multisite - verify all subsites work correctly
 
 ## STEP 5: Backend Testing
 
-### Predefined Tests (Always Run)
-The healer will execute existing tests in `tests/backend/` folder
-
-### Custom Backend Tests (If Plan Exists)
+### Backend Tests
 If `test-plans/backend/plan.md` **EXISTS**:
-- User wants additional backend testing beyond the defaults
-- Read the plan and interpret what custom admin testing is needed
-- Create **NEW** spec file(s) following the backend VRT file naming convention below
-- Do NOT modify the existing predefined test files
+- Read the plan and interpret what admin testing is needed
+- Create spec file(s) under `tests/backend/` following the backend VRT file naming convention below
 
 Example backend plan:
 ```markdown
@@ -208,7 +212,7 @@ Frontend tests naturally combine interactions with VRT since you need to interac
 3. **Confirm** understanding with user - summarize what will be tested and wait for confirmation
 4. **Setup** browser via `generator_setup_page`
 5. **Frontend Testing**: Parse plan and follow user's intent (navigation discovery, specific pages, interactions, multisite, etc.)
-6. **Backend Testing**: If backend plan exists, create spec files following backend VRT naming convention (predefined tests already exist)
+6. **Backend Testing**: If backend plan exists, create spec files following backend VRT naming convention
 7. **Generate** spec files via `generator_write_test`
 8. **Follow Best Practices for tests**: Split tests into appropriate spec files, use correct imports, include VRT + assertions, set viewport for screenshots, etc.
 
@@ -232,13 +236,14 @@ Frontend tests naturally combine interactions with VRT since you need to interac
 
 - **Backend VRT Naming**: Backend files with ONLY VRT tests MUST use `-vrt.spec.ts` suffix and be organized per module/feature
 - **Frontend Flexibility**: Frontend tests can freely mix VRT + interactions in same file (no special naming)
-- **Imports (All Tests)**: ALWAYS use `import { test, expect } from './utils';` for ALL tests (automatic trial screen handling)
+- **Imports (All Tests)**: ALWAYS use `import { test, expect } from './utils';` for ALL tests (automatic trial screen and auth handling)
+- **Backend Auth**: The `page` fixture handles login automatically via auth-before-all mutex. **Never call `loginToSitefinity(page)` in test bodies.** Import `waitForSitefinityBackendListLoaded` from `./utils` and call it before every backend VRT screenshot on list/grid pages.
 - **VRT**: Always use `toHaveScreenshot()` for visual regression (set viewport to 1920x1080 via `browser_resize` first)
 - **Interactions**: Test buttons, forms, navigation, modals, sliders, accordions, etc.
 - **Assertions**: Use `toBeVisible()`, `toContainText()`, `toHaveURL()` to verify behavior
 - **Fallback max pages**: 3 pages when auto-discovering
 - **Free-form plans**: Interpret user intent, don't expect strict format
-- **Backend predefined tests**: Never modify `admin.spec.ts`, `auth.spec.ts`, or `content.spec.ts`
+
 - **Follow Best Practices for tests**: Dont add all tests into a single spec file. Split tests into appropriate spec files, use correct imports, include VRT + assertions, set viewport for screenshots, and follow general Playwright best practices.
 
 ## Next Steps After Completion
