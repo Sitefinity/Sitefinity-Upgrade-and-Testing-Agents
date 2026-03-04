@@ -99,6 +99,7 @@ export default defineConfig({
     {
       name: 'backend-chromium',
       testDir: './tests/backend',
+      testIgnore: /-vrt\.spec\.ts$/,
       snapshotPathTemplate: './snapshots/backend/{testFilePath}-snapshots/{arg}{ext}',
       use: { 
         ...devices['Desktop Chrome'],
