@@ -1,15 +1,13 @@
-# Sitefinity upgrade agents instructions
+# Sitefinity Upgrade and Testing Agents
 
-# Important!
+A pipeline of specialized AI agents that generate tests for your Sitefinity CMS site, execute an automated upgrade to a newer version, and then run the tests against the upgraded site to verify its post-upgrade state and surface any issues if they occurred. After the upgrade, the agents automatically fix breaking changes introduced by the new version and resolve runtime errors that may appear during site initialization. The entire process is designed to run with minimal manual intervention — you start each agent, review its output, and move to the next.
+
+## Important!
 With this project we are aiming to reduce the friction of upgrading Sitefinity CMS projects to a minimum. This is a complex process and we have built our agents to be as robust as possible and adaptable to different projects and upgrade scenarios.
 The agents are designed to run without needing any instructions in advance. Each one of them knows its goal and how to achieve it. We don't expect issues to occur often, but if you notice an agent drifting from its intent or losing focus during execution, the general guidance is to open a new conversation with the same agent and simply prompt it to "start" — it will pick up from where it needs to.
 Keep in mind that AI agents are non-deterministic by nature and may occasionally produce imperfect results. We have designed ours to minimize the chances of that, but we advise you to review each agent's output along the way. If an agent asks for input or you are not entirely happy with the results, this is the moment to step in — you can open a new conversation and ask it to try again or give it specific instructions on what to do differently in the same conversation.
 
-In the [Agents Overview](#agents-overview) section below you can find more details about what each agent does and guidance on how to act in case the agent output is not satisfactory.
-
-## Project Overview
-
-AI custom agents and an MCP server that automate Sitefinity CMS upgrades. Agents perform test generation, upgrade execution, error fixing, and verification with the help of the MCP server tools.
+In the [Agent Playbook](#agent-playbook) section below you can find more details about what each agent does and guidance on how to steer the agent if needed to produce optimal results.
 
 ## Prerequisites
 
@@ -17,10 +15,12 @@ AI custom agents and an MCP server that automate Sitefinity CMS upgrades. Agents
 - GitHub Copilot PRO subscription
 - Node.js (v18 or higher) and npm
 - Working and compiled Sitefinity CMS solution
-- Running Sitefinity instance (for test execution)
+- Running Sitefinity instance (for test generation and execution)
 - Visual Studio 2019 or newer
 - Sitefinity CLI tool installed and added to PATH
 - Playwright (auto-installed via `npm install`)
+
+> **Recommended:** Keep the Sitefinity project being upgraded under source control (e.g., Git).
 
 ## Local Development Setup
 
@@ -46,6 +46,8 @@ AI custom agents and an MCP server that automate Sitefinity CMS upgrades. Agents
        "SourceVersion": "14.4"
      }
      ```
+
+   > **Note:** `BackendCredentials` are only required if you plan to generate backend (admin panel) tests. You can leave them empty for frontend-only testing.
    - Update the "Source Project" folder path to point to your Sitefinity project:
      ```json
      {
@@ -85,7 +87,7 @@ AI custom agents and an MCP server that automate Sitefinity CMS upgrades. Agents
 
 ## Running the Agents
 
-Run the agents in the sequence listed below, one at a time. Each agent will tell you which agent to run next when it finishes.
+Run the agents in the sequence listed below, one at a time. To launch an agent, simply type **"start"** in the chat — that is all it needs. Each agent knows its job and will begin working immediately. When it finishes, it will tell you which agent to run next.
 
 > **Always start each agent in a new chat session.** This keeps the context window clean and prevents agents from losing focus. If an agent's responses start drifting or becoming less accurate mid-session, open a fresh chat with the same agent and prompt it to "start" — it will resume its workflow.
 
@@ -101,20 +103,33 @@ Run the agents in the sequence listed below, one at a time. Each agent will tell
 | | @sf-post-upgrade-runtime-repairer | Fixes runtime errors so the site loads |
 | **3. Verification** | @sf-post-upgrade-analyzer | Runs tests and analyzes failures — produces a report |
 
+## Agent Playbook
 
-## Agents Overview
-
-**Test execution parallelism:** Both frontend and backend tests run in parallel using Playwright's default worker count. Backend tests rely on a before-all login mechanism (`ensureAuthFile` mutex) that performs a single login per 30-minute window and shares the authenticated session across all workers via `storageState`. This avoids per-test login overhead and session conflicts despite parallel execution.
+> This section explains what each agent does and includes field-tested tips and guidance on what to expect and how to steer the agent if needed. We recommend reading the tips for each agent while it is running — they will help you understand what is happening and get the best results from that session.
 
 ### Pre-upgrade Agents
 
 #### @sf-test-generator
-Generates Playwright Visual Regression Tests (VRT) and interaction tests for both frontend pages and the Sitefinity admin backend. It auto-discovers pages via site navigation or follows a user-provided test plan. By default, it applies a 70/30 test mix — 70% VRT tests across distinct pages and 30% functional/interaction tests targeting high-value workflows.
+The test generator uses plans to drive both frontend and backend test creation. Plans are located at `test-plans/frontend/plan.md` and `test-plans/backend/plan.md` and are written in plain, human-readable language similar to a prompt — you don't need to specify exact selectors, code, or technical details. You can describe which pages to test, what workflows matter, specify concrete pages or user journeys, or simply request a number of tests (e.g., "Generate 50 test cases"). See `test-plans/example-a.md`, `example-b.md`, and `example-c.md` for reference.
 
-The generator reads test plans from `test-plans/frontend/plan.md` and `test-plans/backend/plan.md`. Plans are written in plain, human-readable language — you don't need to specify exact selectors, code, or technical details. You can simply describe which pages to test, what workflows matter, or just request a number of tests (e.g., "Generate 50 test cases"). See `test-plans/example-a.md`, `example-b.md`, and `example-c.md` for reference.
+The default frontend plan applies a 70/30 test mix — 70% Visual Regression Tests (VRT) across distinct pages and 30% functional/interaction tests targeting high-value workflows. It discovers pages automatically from the site navigation. You can override or customize the plans at any time to fit your project's needs.
+
+When the generator starts, it **lists its understanding of the plans in the chat** before generating any code. This is your opportunity to review and correct:
+
+- **Verify the plan summary.** Read through what the agent lists — check that page URLs, test counts, and workflows match your expectations. If something looks off, tell the agent directly in the chat (e.g., "Skip the /blog page" or "I actually need 30 tests, not 50") and it will adjust before proceeding.
+- **Confirm to start.** Once you are satisfied the agent understood the plans correctly, tell it to go ahead and it will begin generating the test files.
+- **Backend credentials.** If your plans include backend (admin panel) tests, the agent needs valid Sitefinity admin credentials to log in and inspect the backend while writing tests. Make sure `BackendCredentials` is filled in inside `upgrade-and-testing.code-workspace` under `settings.sf_agents` **before** you start the generator. If you are only generating frontend tests, backend credentials are not required and can be left empty.
 
 #### @sf-test-healer
-Debugs and fixes failing Playwright tests before the upgrade begins. It systematically identifies, diagnoses, and remediates test issues — including flaky tests, broken selectors, and VRT baseline mismatches — to establish a fully passing test baseline. If a test cannot be stabilized after multiple attempts, it is marked as `test.fixme()` with a detailed explanation.
+The test healer's job is to run the generated tests and stabilize them — ensuring every test reaches a passing state so you have a reliable baseline before the upgrade begins. This is essential because the upgrade verification later compares post-upgrade results against this baseline, so any test that fails before the upgrade would produce misleading results.
+
+It systematically identifies, diagnoses, and fixes test issues — including flaky tests, broken selectors, and VRT baseline mismatches. It iterates through failing tests one by one, debugging and fixing them in rounds until the full suite passes. If a test cannot be stabilized after multiple attempts, it is marked as `test.fixme()` with a detailed explanation so it does not block the upgrade process.
+
+A few things to keep in mind:
+
+- **Let it run.** The healer may need several rounds of fix-and-rerun cycles — this is normal and expected. Give it enough time to work through all failures so you end up with a clean, fully passing baseline before starting the upgrade.
+- **Carousel and dynamic content stabilization.** The healer is designed to create shared utility functions (e.g., freezing carousels, stopping animations, waiting for AJAX grids) when individual test-level fixes are not enough. If you notice it struggling with a particular dynamic element across multiple rounds, you can nudge it with something like "Try writing a reusable utility to stabilize this" — though in most cases it will arrive at this approach on its own.
+- **VRT baselines.** On the very first run all VRT tests will fail because no baseline screenshots exist yet. The healer knows this and will not treat it as an error — it lets Playwright generate the initial baselines and then re-runs. No action needed from you.
 
 #### @sf-test-dir-builder
 Builds a self-contained `sitefinity-tests` directory inside the Source Sitefinity Project by scaffolding the test structure, copying all tests and VRT snapshots, installing dependencies, and running a smoke test to verify the setup. It can also diagnose and fix setup issues autonomously if the smoke test fails.
@@ -124,16 +139,41 @@ Builds a self-contained `sitefinity-tests` directory inside the Source Sitefinit
 #### @sf-upgrade-source-code-executor
 Upgrades the Sitefinity project to a specified version using the Sitefinity CLI (`sf upgrade`). It handles NuGet restore, MSBuild compilation, and XML validation before each upgrade attempt. If the CLI upgrade fails, it delegates to the `sf-cli-upgrade-error-fixer` subagent to resolve known error patterns and retries automatically.
 
-#### @sf-post-upgrade-build-repairer
-Validates the post-upgrade build and fixes compilation errors iteratively (up to 5 attempts). It cross-references compiler errors against official Sitefinity API breaking changes documentation to apply targeted fixes — such as namespace changes, removed types, and updated method signatures. If breaking changes data is missing, it delegates to the `sf-breaking-changes-fetcher` subagent.
+The CLI upgrade runs inside Visual Studio. While the upgrade is in progress, Visual Studio may display dialogs that require manual user action. **Keep Visual Studio visible and monitor it throughout the upgrade.**
 
+**General rule:** As long as the `run_upgrade` tool is still executing in your agent session and has not returned a result, the upgrade is in progress. Do not interrupt the agent — let it finish.
+
+##### Dialogs you may encounter
+
+1. **"Save As" dialog for `SitefinityWebApp.csproj`**
+   Visual Studio may open a "Save As" file dialog asking where to save the `.csproj` file. This dialog blocks the upgrade process. Click **Cancel** to dismiss it and allow the upgrade to continue.
+
+2. **"Project modified outside the environment" dialog**
+   Visual Studio may detect that project files have been modified externally (by the CLI) and ask whether to reload the project. **Do not click Reload** — choose **Ignore** or simply do not interact with this dialog. Reloading the project mid-upgrade can interfere with the CLI process.
+
+3. **NuGet Package Manager — "Restart Visual Studio" prompt**
+   If the NuGet Package Manager reports that a package could not be removed and requires a Visual Studio restart, a **Restart** button will appear next to the message. Click **Restart**. Visual Studio may not reopen automatically after this — that is expected. As long as the agent session still shows the `run_upgrade` tool running, the CLI upgrade is still executing in the background and should not be interrupted.
+
+##### Verifying the upgrade is still running
+
+If Visual Studio has closed and you want to confirm the upgrade is still progressing, open a **separate VS Code window** (or terminal) pointing at your Sitefinity project and check the **Git Changes** tab. If new file modifications keep appearing, the CLI is actively making changes and the upgrade is proceeding normally.
+
+#### @sf-post-upgrade-build-repairer
+Validates the post-upgrade build and fixes compilation errors iteratively. It cross-references compiler errors against official Sitefinity API breaking changes documentation to apply targeted fixes — such as namespace changes, removed types, and updated method signatures. If breaking changes data is missing, it delegates to the `sf-breaking-changes-fetcher` subagent.
 #### @sf-post-upgrade-runtime-repairer
 Validates that the Sitefinity site loads correctly after the upgrade and repairs runtime errors. It navigates to the homepage, detects ASP.NET/Sitefinity error screens, and applies fixes sourced from the Progress Knowledge Base and Community Archive. It performs a clean rebuild verification to ensure all fixes are durable.
 
 ### Verification Agents
 
 #### @sf-post-upgrade-analyzer
-Runs all Playwright tests after the upgrade and analyzes failures without attempting to fix them. It categorizes issues (custom widgets, built-in widgets, JS errors, layout/CSS, visual regressions, etc.) and generates a CSV report with detailed findings. It investigates failures concurrently while the test suite is still running for maximum efficiency.
+Runs all Playwright tests after the upgrade and analyzes failures without attempting to fix them. It categorizes issues (custom widgets, built-in widgets, JS errors, layout/CSS, visual regressions, etc.) and generates an Excel report with detailed findings. The agent helps identify potential root causes for each failure, but its conclusions should be treated as guidance — a human reviewer should verify all findings and make the final judgment on each issue. It investigates failures concurrently while the test suite is still running for maximum efficiency.
+
+Here is what to expect:
+
+- **Wait for tests to start.** After the agent launches the test command, you should see test output appearing in the chat within the first one to two minutes. If no test output appears after that window, simply open a new chat session with the same agent and prompt it to "start" — it will re-launch the run.
+- **Live failure investigation.** While the suite is running, the agent monitors output and begins debugging failing tests as they appear — navigating to failing pages, capturing screenshots, and checking console errors — all without interrupting the ongoing test execution. This means analysis is happening concurrently, saving you significant time.
+- **Only truly failed tests are analyzed.** Tests that fail on an initial attempt but pass on a Playwright retry are considered flaky and are excluded from the analysis report. The agent focuses exclusively on tests that remain failed in the final summary.
+- **Do not approve any other commands while tests are running.** If the agent suggests running a PowerShell command or any other action that requires your approval, **do not click Allow** until the test suite has finished. Running additional commands while tests are executing will interrupt the test run and you will need to start over.
 
 ### Subagents (invoked automatically by parent agents)
 
@@ -144,3 +184,5 @@ Analyzes Sitefinity CLI upgrade failures by reading the PowerShell upgrade log, 
 Fetches and caches Sitefinity API breaking changes from the official Progress documentation for the relevant upgrade version range. It extracts version-specific data from the documentation page and stores it locally as markdown files. It is invoked as a subagent by `sf-post-upgrade-build-repairer` when breaking changes data is missing.
 
 ---
+
+By using this project you accept the terms in [EULA.md](EULA.md).
