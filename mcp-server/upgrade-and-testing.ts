@@ -5,6 +5,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { getUpgradeSettingsHandler, restorePackagesHandler, buildSolutionHandler, runUpgradeHandler, getUpgradeLogHandler, prepareBuildEnvironmentHandler, getBreakingChangesHandler } from "./handlers/upgradeHandler.js";
 import { scaffoldTestDirectoryHandler, validateTestStructureHandler } from "./handlers/testDirectoryHandler.js";
+import { prepareNextUpgradeHandler } from "./handlers/prepareNextUpgradeHandler.js";
 
 // Create an MCP server
 const server = new McpServer({
@@ -128,6 +129,16 @@ server.registerTool(
     },
   },
   validateTestStructureHandler
+);
+
+// Tool to reset the workspace for the next upgrade project
+server.registerTool(
+  "prepare_next_upgrade",
+  {
+    description: "Resets the upgrade-and-testing workspace for a new Sitefinity project. Deletes all generated spec files (tests/frontend/*.spec.ts, tests/backend/*.spec.ts), restores utils (tests/frontend/utils.ts, tests/backend/utils.ts, tests/utils/playwright-utils.ts) and test plans (test-plans/frontend/plan.md, test-plans/backend/plan.md) from clean defaults stored in resources/defaults/, clears test-artifacts/, test-results/, playwright-report/, logs/, snapshots/, and deletes .playwright-mcp/. NOTE: the upgrade-and-testing.code-workspace file must be updated manually by the user to point to the new Source Project path.",
+    inputSchema: {},
+  },
+  prepareNextUpgradeHandler
 );
 
 // Start the server
