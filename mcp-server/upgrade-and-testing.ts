@@ -5,7 +5,9 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { getUpgradeSettingsHandler, restorePackagesHandler, buildSolutionHandler, runUpgradeHandler, getUpgradeLogHandler, prepareBuildEnvironmentHandler, getBreakingChangesHandler } from "./handlers/upgradeHandler.js";
 import { scaffoldTestDirectoryHandler, validateTestStructureHandler } from "./handlers/testDirectoryHandler.js";
-import { prepareNextUpgradeHandler } from "./handlers/prepareNextUpgradeHandler.js";
+import { cleanEnvironmentHandler } from './handlers/cleanEnvironmentHandler.js';
+import { mergeTestsToProjectHandler } from './handlers/mergeTestsToProjectHandler.js';
+import { seedTestWorkspaceHandler } from './handlers/seedTestWorkspaceHandler.js';
 
 // Create an MCP server
 const server = new McpServer({
@@ -131,14 +133,39 @@ server.registerTool(
   validateTestStructureHandler
 );
 
-// Tool to reset the workspace for the next upgrade project
+// Tool to clean the upgrade-and-testing workspace (used before generating new tests or initiating a new upgrade cycle)
 server.registerTool(
-  "prepare_next_upgrade",
+  "clean_environment",
   {
-    description: "Resets the upgrade-and-testing workspace for a new Sitefinity project. Deletes all generated spec files (tests/frontend/*.spec.ts, tests/backend/*.spec.ts), restores utils (tests/frontend/utils.ts, tests/backend/utils.ts, tests/utils/playwright-utils.ts) and test plans (test-plans/frontend/plan.md, test-plans/backend/plan.md) from clean defaults stored in resources/defaults/, clears test-artifacts/, test-results/, playwright-report/, logs/, snapshots/, and deletes .playwright-mcp/. NOTE: the upgrade-and-testing.code-workspace file must be updated manually by the user to point to the new Source Project path.",
+    description: "Clears the upgrade-and-testing workspace for a fresh test generation cycle or fresh upgrade. Deletes all generated spec files (tests/frontend/*.spec.ts, tests/backend/*.spec.ts), restores utils (tests/frontend/utils.ts, tests/backend/utils.ts, tests/utils/playwright-utils.ts) and test plans (test-plans/frontend/plan.md, test-plans/backend/plan.md) from clean defaults stored in resources/defaults/, clears test-artifacts/, test-results/, playwright-report/, logs/, snapshots/, and deletes .playwright-mcp/. Safe to call at any time — only affects the upgrade-and-testing project, never the Source Project.",
     inputSchema: {},
   },
-  prepareNextUpgradeHandler
+  cleanEnvironmentHandler
+);
+
+// Tool to merge newly generated tests and snapshots into an existing source project test directory
+server.registerTool(
+  "merge_tests_to_project",
+  {
+    description: "Merges the tests and snapshots from the upgrade-and-testing workspace into an existing test directory in the Source Project (e.g. sitefinity-tests/ or a renamed equivalent). Copies all *.spec.ts files from tests/frontend/ and tests/backend/, copies utility files (utils.ts, playwright-utils.ts), and copies all snapshot images from snapshots/frontend/ and snapshots/backend/ into the target directory. Overwrites files with the same name. IMPORTANT: any test.fixme( calls that were added by seed_test_workspace are automatically converted back to test( on copy so all tests run normally in subsequent runs. Existing files in the target that are NOT present in upgrade-and-testing are left untouched (additive merge, not a full replace).",
+    inputSchema: {
+      targetTestsDir: z.string().describe("Absolute path to the existing test directory in the Source Project (e.g. C:/MyProject/sitefinity-tests or the renamed equivalent). This directory must already exist."),
+    },
+  },
+  mergeTestsToProjectHandler
+);
+
+// Tool to seed the upgrade-and-testing workspace from an existing source project test directory
+server.registerTool(
+  "seed_test_workspace",
+  {
+    description: "Seeds the upgrade-and-testing workspace from an existing test directory in the Source Project. Copies all utility files (utils.ts, playwright-utils.ts) and optionally copies specific spec files that need to be extended. Spec files that are copied for extension have all their test() calls automatically marked as test.fixme() so they are skipped during the healing run — only the new tests added by the extender will be executed and healed. The fixme markers are automatically removed when the tests are merged back to the source project via merge_tests_to_project.",
+    inputSchema: {
+      sourceTestsDir: z.string().describe("Absolute path to the existing test directory in the Source Project (e.g. C:/MyProject/sitefinity-tests or renamed equivalent). This directory must already exist."),
+      specsToExtend: z.array(z.string()).optional().describe("Relative paths of spec files to copy for extension, e.g. ['frontend/homepage.spec.ts', 'backend/content-nav-vrt.spec.ts']. Tests in these files will be marked as test.fixme() so they are skipped during healing. Omit or pass [] if no existing specs need to be extended."),
+    },
+  },
+  seedTestWorkspaceHandler
 );
 
 // Start the server

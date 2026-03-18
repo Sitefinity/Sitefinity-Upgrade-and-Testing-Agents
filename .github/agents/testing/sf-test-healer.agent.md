@@ -2,7 +2,7 @@
 name: sf-test-healer
 description: Debugs and fixes failing Playwright tests. Ensures all playwright tests pass before upgrade.
 tools:
-  ['execute/getTerminalOutput', 'execute/killTerminal', 'execute/runInTerminal', 'read/readFile', 'edit/createDirectory', 'edit/createFile', 'edit/createJupyterNotebook', 'edit/editFiles', 'edit/editNotebook', 'search/changes', 'search/codebase', 'search/fileSearch', 'search/listDirectory', 'search/searchResults', 'search/textSearch', 'search/usages', 'playwright-test/browser_console_messages', 'playwright-test/browser_evaluate', 'playwright-test/browser_generate_locator', 'playwright-test/browser_network_requests', 'playwright-test/browser_resize', 'playwright-test/browser_snapshot', 'playwright-test/test_debug', 'playwright-test/test_list', 'playwright-test/test_run', 'agent']
+  ['execute/getTerminalOutput', 'execute/killTerminal', 'execute/runInTerminal', 'read/readFile', 'edit/createDirectory', 'edit/createFile', 'edit/createJupyterNotebook', 'edit/editFiles', 'edit/editNotebook', 'search/changes', 'search/codebase', 'search/fileSearch', 'search/listDirectory', 'search/searchResults', 'search/textSearch', 'search/usages', 'playwright-test/browser_console_messages', 'playwright-test/browser_evaluate', 'playwright-test/browser_generate_locator', 'playwright-test/browser_network_requests', 'playwright-test/browser_resize', 'playwright-test/browser_snapshot', 'playwright-test/test_debug', 'playwright-test/test_list', 'playwright-test/test_run', 'upgrade-and-testing/merge_tests_to_project', 'agent']
 model: Claude Sonnet 4.6
 ---
 
@@ -110,6 +110,25 @@ Key principles:
   of the expected behavior.
 - Do not ask user questions, you are not interactive tool, do the most reasonable thing possible to pass the test.
 - Never wait for networkidle or use other discouraged or deprecated apis
+
+## Merging Tests into the Source Project (on explicit user request only)
+
+> **Only perform this step when the user explicitly asks** — for example: *"copy the tests to the source project"* or *"merge the tests"*. Do NOT trigger this automatically.
+
+This applies when the healer was run after the **sf-test-suite-extender** agent and the user wants to merge the newly healed tests and snapshots back into the Source Project's existing test directory.
+
+Call the `merge_tests_to_project` tool with:
+```
+targetTestsDir: {absolute path to the existing test directory in the Source Project}
+```
+
+- Default path: `{SourceFilesPath}/sitefinity-tests` — ask the user if you're unsure of the path, or if the directory may have been renamed.
+- The tool requires the target directory to **already exist** — it does not create the root directory.
+- It will copy all `*.spec.ts` files, utility files (`utils.ts`, `playwright-utils.ts`), and all snapshot images from `snapshots/frontend/` and `snapshots/backend/` into the target. Existing files with the same name are overwritten; files in the target that don't exist in upgrade-and-testing are left untouched.
+
+After the tool completes, report a summary of what was copied and where.
+
+In case the merge `merge_tests_to_project` executed, the healer shouldn't suggest running the sf-test-dir-builder as the dir is already built and the user just extended it with more tests.
 
 ## Next Steps After Completion
 

@@ -185,4 +185,119 @@ Fetches and caches Sitefinity API breaking changes from the official Progress do
 
 ---
 
+## Preparing for the Next Upgrade
+
+Once you have finished an upgrade cycle and want to start a new one for a different Sitefinity project, you need to reset the upgrade-and-testing workspace so it is ready for the new project.
+
+### Step 1 — Clean the workspace
+
+Open a chat in the default **GitHub Copilot** agent mode (not a custom agent) and send:
+
+> prepare the environment for the next upgrade
+
+Copilot will call the `clean_environment` tool, which does the following:
+- Deletes all generated spec files from `tests/frontend/` and `tests/backend/`
+- Restores utility files (`utils.ts`, `playwright-utils.ts`) and test plans to their clean defaults
+- Clears `test-artifacts/`, `test-results/`, `playwright-report/`, `logs/`, `snapshots/`, and `.playwright-mcp/`
+
+No files in your Source Project are touched. The tool reports exactly what was deleted and restored so you can verify.
+
+### Step 2 — Point to the new project
+
+After the cleanup, open `upgrade-and-testing.code-workspace` and update the `Source Project` folder path and `settings.sf_agents` to match the new Sitefinity project:
+
+```json
+{
+  "name": "Source Project",
+  "path": "C:\\path\\to\\new\\sitefinity\\project"
+}
+```
+
+Also update `SitefinityUrl`, `TargetVersion`, `SourceVersion`, and `BackendCredentials` as needed.
+
+### Step 3 — Run the upgrade workflow
+
+You are ready to go. Follow the [Agent Sequence](#agent-sequence) from the beginning.
+
+---
+
+## Extending an Existing Test Suite
+
+Use this workflow when you already have a `sitefinity-tests/` directory in your Source Project with a passing test suite and you want to add more tests — more pages, more interactions, more backend modules — without duplicating what is already there. This workflow is independent of the upgrade process and can be run at any time.
+
+### When to use this
+
+- You want broader frontend coverage (more pages, more interactions)
+- You want additional backend module tests
+- You want to add tests to a specific existing spec file (e.g., extend `homepage.spec.ts` with more tests)
+- You ran the initial test generation a while ago and the site has grown since then
+
+### Step 1 — Update the test plans
+
+Edit `test-plans/frontend/plan.md` and/or `test-plans/backend/plan.md` to describe what additional tests you want.
+
+The plans are free-form text — write them like a prompt. To add brand-new spec files simply describe the pages or workflows:
+
+```markdown
+Test 20 more pages from the navigation menu 
+Test the /about page and its sub-pages
+```
+
+To extend an **existing** spec file with more tests, say so explicitly:
+
+```markdown
+Extend homepage.spec.ts with 5 more tests
+Add tests for /about to the existing file
+```
+
+The extender agent reads these instructions and knows to copy that spec into the workspace. Existing tests in the spec are temporarily skipped with test.fixme() while the spec is being extended. The test.fixem() skipping of the original tests is removed automatically at the end of the process when the spec is copied back to the Source Project, so all tests run normally on subsequent runs.
+
+### Step 2 — Run @sf-test-suite-extender
+
+Open a new chat session, select the **@sf-test-suite-extender** agent, and type **start**.
+
+The agent will:
+1. Verify the Source Project is configured and `sitefinity-tests/` exists
+2. Read all existing spec files and build an inventory of what is already covered
+3. Read the test plans to understand what to add
+4. **Clear the upgrade-and-testing workspace** and **seed it** with your utility files (and any spec files to be extended, with their existing tests temporarily marked as `test.fixme()` so they are skipped during healing)
+5. Present a plan — new spec files + any specs being extended — and wait for your confirmation before writing any code
+6. Generate the new tests
+
+The agent will present a plan for review before writing any code. Key things to verify:
+- **New spec files**: each entry should be a brand-new file name covering pages or modules not yet in the test suite
+- **Specs to extend**: if you asked to extend an existing spec, confirm it appears in the list
+- **No duplicates**: pages already covered in the existing suite should not appear
+
+> **Note**: All new tests go into **brand-new spec files** by default. Only specs that the test plan explicitly requests to extend are edited in-place.
+
+Once all tests are generated, proceed to Step 3.
+
+### Step 3 — Run @sf-test-healer
+
+Open a new chat session, select **@sf-test-healer**, and type **start**.
+
+The healer will run all tests in the upgrade-and-testing workspace. You will notice two types of tests:
+- **New tests** (in new spec files, or added to the bottom of an extended spec) — these will be run and healed normally
+- **Pre-existing tests** (in extended spec files, marked as `test.fixme()`) — these are skipped. They are already known to pass in the Source Project and do not need to be re-healed
+
+Let the healer work through all failures until the new tests are stable. VRT baselines are generated on the first run — this is expected and not an error.
+
+### Step 4 — Copy the results back to your Source Project
+
+When the healer has finished and you are satisfied with the results, **explicitly tell it**:
+
+> copy the tests to the source project
+
+The healer will call the `merge_tests_to_project` tool, which:
+- Copies all new and updated `*.spec.ts` files from `tests/frontend/` and `tests/backend/` into `sitefinity-tests/tests/`
+- Copies updated utility files (`utils.ts`, `playwright-utils.ts`) — any improvements made during healing are included
+- Copies all new snapshot images from `snapshots/frontend/` and `snapshots/backend/` into `sitefinity-tests/snapshots/`
+- **Automatically removes all `test.fixme()` markers** that were added to the extended specs — so all tests (old and new) run normally on subsequent runs
+- Existing files in `sitefinity-tests/` that were not touched are left as-is (additive merge)
+
+That is it — your `sitefinity-tests/` directory now contains the full extended suite, ready to run.
+
+---
+
 By using this project you accept the terms in [EULA.md](EULA.md).
