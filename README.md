@@ -17,7 +17,7 @@ In the [Agent Playbook](#agent-playbook) section below you can find more details
 - Working and compiled Sitefinity CMS solution
 - Running Sitefinity instance (for test generation and execution)
 - Visual Studio 2019 or newer
-- Sitefinity CLI tool installed and added to PATH
+- [Sitefinity CLI](https://github.com/Sitefinity/Sitefinity-CLI) tool installed and added to PATH - [documentation on the CLI tool](https://www.progress.com/documentation/sitefinity-cms/upgrade-using-sitefinity-cli) 
 - Playwright (auto-installed via `npm install`)
 
 > **Recommended:** Keep the Sitefinity project being upgraded under source control (e.g., Git).
