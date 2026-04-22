@@ -66,8 +66,29 @@ For each error (max 5 attempts per unique error):
 - Reload homepage after applying fix
 - If error persists → Return to Step 4 (increment attempt counter)
 - If new error appears → Reset counter, start Step 4 for new error
-- If page loads successfully → Proceed to **Step 6**
+- If page loads successfully → Proceed to **Step 5.5**
 - If 5 attempts exhausted → Report to user for manual intervention (see Error Report Format)
+
+### Step 5.5: Bump Stale Sitefinity Config Versions
+Sitefinity automatically bumps most of its `App_Data/Sitefinity/Configuration/*.config` files to the new product version on first request after an upgrade, but a few files are typically left on the previous version. This step finds those stragglers and updates their `version=` attribute to the target version so the project's config state is fully consistent with the upgraded product.
+
+**Run this step ONLY after Step 5 confirms the homepage (or the license-application screen) loads successfully** — letting Sitefinity perform its own bumps first means we only touch the files it didn't.
+
+a. **Locate the configuration folder.** The default path is `<sourcePath>/App_Data/Sitefinity/Configuration/`. If that exact folder does not exist, **search for it**: `App_Data` may be nested (e.g. `<sourcePath>/SitefinityWebApp/App_Data/...` or deeper). Use the `search` tool to find any `App_Data/Sitefinity/Configuration` folder under `sourcePath` and use the first match. If no such folder exists anywhere, log it and proceed to Step 6 — nothing to bump.
+
+b. **Read the target version** from the `targetVersion` field returned by `get_upgrade_settings` in Step 1 (e.g. `15.4.8625`).
+
+c. **For each `*.config` file in the located folder:**
+   - Read the file and find the first `version="x.y.z.w"` attribute on the root config element (Sitefinity stores it on the top-level element of each config file).
+   - If the attribute is absent → skip the file silently (not all configs carry a version).
+   - Parse the version as four numeric components and compare to `targetVersion` **numerically**, not as strings (so `14.4.8144 < 15.4.8625` is correct — a string compare would get `"15.4.8625" < "9.0.0"`).
+   - If the file's version is **lower** than `targetVersion` → use the `edit` tool (`replace_string_in_file` / `multi_replace_string_in_file`) to replace the old `version="x.y.z.w"` attribute value with the new target version directly in the file. **Never use terminal commands, PowerShell, or CLI tools for this** — always use the file-editing tool. Do not modify any other content in the file.
+   - If the file's version is **equal** → leave alone.
+   - If the file's version is **higher** than `targetVersion` → do NOT modify; log it as a warning (this can indicate the workspace `TargetVersion` setting is wrong or the file was edited manually).
+
+d. **Report** which files were bumped (file name + old version → new version) and which were skipped or warned about. Then proceed to Step 6.
+
+> **Why this is between Step 5 and Step 6:** Step 6 performs a clean rebuild and reload, which doubles as the verification that the bumped configs do not break site startup.
 
 ### Step 6: Clean Build Verification
 Once the site loads successfully, verify the fixes are durable by doing a full clean rebuild:

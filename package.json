@@ -20,8 +20,16 @@
     "mcp",
     "model-context-protocol"
   ],
-  "author": "",
-  "license": "ISC",
+  "author": "Progress Software Corporation",
+  "license": "SEE LICENSE IN EULA.md",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sitefinity/Sitefinity-Upgrade-and-Testing-Agents.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Sitefinity/Sitefinity-Upgrade-and-Testing-Agents/issues"
+  },
+  "homepage": "https://github.com/Sitefinity/Sitefinity-Upgrade-and-Testing-Agents#readme",
   "devDependencies": {
     "@playwright/test": "^1.49.0",
     "@types/node": "^24.10.1",

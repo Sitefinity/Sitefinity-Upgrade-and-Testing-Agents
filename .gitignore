@@ -33,3 +33,5 @@ blob-report/
 snapshots/
 tests/frontend/*
 !tests/frontend/utils.ts
+tests/backend/*
+!tests/backend/utils.ts
