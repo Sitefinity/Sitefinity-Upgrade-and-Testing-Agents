@@ -12,7 +12,8 @@
       "command": "npx",
       "args": [
         "-y",
-        "@playwright/mcp@0.0.68"
+        "playwright@1.57.0",
+        "run-test-mcp-server"
       ]
     }
   }
