@@ -11,8 +11,9 @@ In the [Agent Playbook](#agent-playbook) section below you can find more details
 
 ## Prerequisites
 
+- The Sitefinity Upgrade and Testing Agents support upgrading projects that run on Sitefinity CMS version 10.0 and above.
 - Visual Studio Code 1.109 or newer
-- GitHub Copilot PRO subscription
+- GitHub Copilot PRO subscription or higher
 - Node.js (v18 or higher) and npm
 - Working and compiled Sitefinity CMS solution
 - Running Sitefinity instance (for test generation and execution)
